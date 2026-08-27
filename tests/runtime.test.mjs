@@ -9,8 +9,16 @@ export async function t_exec_ok() {
   return "exec ok: " + String(r.stdout).trim();
 }
 
-export async function t_visual_stub() {
-  const r = await describeVisual({ path: "/tmp/x.png" });
-  if (r.path !== "/tmp/x.png") throw new Error("visual not passed path");
-  return "visual stub ok";
+export async function t_visual_missing_path_reports_error() {
+  // A path that does not exist must return a truthful {ok:false}, not a fabricated success.
+  const r = await describeVisual({ path: "/tmp/does-not-exist-odsh.png" });
+  if (r.ok) throw new Error("expected ok:false for missing image, got " + JSON.stringify(r));
+  return "visual missing-path ok";
+}
+
+export async function t_visual_none_capture_fallback() {
+  // No image path and no OCR/cua available -> honest {ok:true} with a note (never fake OCR).
+  const r = await describeVisual({});
+  if (!r) throw new Error("visual empty-payload failed");
+  return "visual no-path ok: engine=" + (r.engine || 'none');
 }

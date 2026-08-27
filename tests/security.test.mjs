@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // security.test.mjs - security regression scans for ODSH-Native (npm test).
 import { readFileSync, readdirSync, statSync } from "node:fs";
-import { join, resolve, dirname } from "node:path";
+import { join, resolve, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -13,12 +13,12 @@ function walk(acc, dir) {
     const p = join(ROOT, dir, e);
     let st; try { st = statSync(p); } catch { continue; }
     if (st.isDirectory()) { if (!SKIP_DIRS.includes(e)) walk(acc, join(dir, e)); }
-    else if (/.(mjs|js|ts|json|md|sh|ps1)$/.test(e)) acc.push({ rel: join(dir, e), path: p });
+    else if (/.(mjs|js|ts|json|md|sh|ps1)$/.test(e)) acc.push({ rel: join(dir, e).split(sep).join("/"), path: p });
   }
   return acc;
 }
 const files = walk([], "");
-const read = (rel) => { try { return readFileSync(join(ROOT, rel), "utf8"); } catch { return ""; } };
+const read = (rel) => { try { return readFileSync(join(ROOT, rel.split("/").join(sep)), "utf8"); } catch { return ""; } };
 
 let failures = 0;
 function ok(n){ console.log("  \u2713 " + n); }
