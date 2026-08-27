@@ -1,6 +1,7 @@
 // registry.mjs — ODSH-Native 能力/插件注册表（fail-closed，安全发现）
 import { readdir, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const TOOL_NAME_RE = /^[A-Za-z0-9_][A-Za-z0-9_\-]*$/; // 工具名白名单
 
@@ -30,7 +31,8 @@ export class Registry {
         continue;
       }
       try {
-        const mod = await import(resolve(p, t.impl || 'tool.mjs'));
+        // Windows: dynamic import needs a file:// URL for absolute paths, otherwise the ESM loader rejects protocol 'h:'.
+        const mod = await import(pathToFileURL(resolve(p, t.impl || 'tool.mjs')).href);
         this.tools.set(t.name, { plugin: name, manifest, t, run: mod.run || mod.default });
       } catch (err) {
         console.warn('[registry] failed to load', name + '/' + t.name, err.message);
