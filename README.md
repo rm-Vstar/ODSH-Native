@@ -1,18 +1,59 @@
-# ODSH-Native
+# ODSH-Native — DeepSeek Harness capabilities as an OpenClaw plugin
 
-全新宿主机产品（区别于 ODSH-Bridge for Docker）。让 OpenClaw 在宿主机（优先 Windows），不依赖「Windows Node + SSH 桥 + 第二个 LLM」：
-- ① 跨平台不抢焦点的桌面系统操作与视觉能力（本地 CUA）
-- ② 干净 sub-agent（复用 OpenClaw 原生 `agent exec`：一次性/临时状态/无 persona/记忆）
-- ③ 原生 DSH 插件能力（插件 = 本地可发现、可注册的工具）
+> ODSH-Native is a host-side re-bundle of the ODSH-Bridge idea: instead of wiring
+> two containers and a file-envelope bridge, it packages **DeepSeek Harness (DSH)**
+> execution and plugin/capability surface as a *native OpenClaw plugin* — no second
+> LLM, no Windows-Node + SSH bridge, no Docker requirement.
 
-## 主线语言
-- Node.js / ESM（对齐 OpenClaw 生态）；CUA 本地 spawn。
+## What it does
 
-## 状态
-- 注册表可用：node src/registry.mjs list / invoke
-- 干净 worker：node src/worker/clean-exec.mjs <task>
-- 本地工具：src/tools/exec.mjs、src/tools/cua.mjs
-- 设计：docs/ARCHITECTURE.md
+- **A-class agent tools** — `odsh.exec`, `odsh.cua`, `odsh.visual`, `odsh.serve` registered as first-class OpenClaw agent tools.
+- **B-class resident services** — auto-watch (`services/watcher.mjs`) and scheduling (`services/scheduler.mjs`) hosted by the plugin lifecycle.
+- **DSH Harness hosting** — `odsh.serve` + `runtime/dsh-worker.mjs` bridge (internal local subprocess, or remote against an HTTP DSH/Cordis worker).
+- **Clean sub-agent** — reuses OpenClaw native `agent exec` / `sessions_spawn` (no second LLM, no persona/memory for ad-hoc tasks).
 
-## 关联
-- ODSH-Bridge for Docker：https://github.com/Mikoribbit/ODSH-Bridge
+## Design decisions
+
+- **Native plugin, not a bridge runtime.** Uses the official `openclaw/plugin-sdk/tool-plugin` `defineToolPlugin` contract; no self-built registry-as-runtime.
+- **openclaw is a peer dependency** — provided by the host OpenClaw, not bundled.
+- **Language** — TypeScript/ESM plugin entry (`src/index.ts`); runtime tool logic in plain ESM (`src/runtime/*.mjs`) so it runs without a TS build chain.
+
+## Getting started (see docs/QUICKSTART)
+
+```bash
+# 1. install the plugin peer SDK for local validation (host OpenClaw provides it at runtime)
+npm install --no-save openclaw@2026.7.1-2
+
+# 2. syntax check / tests / build
+npm run check
+npm test
+node scripts/build.mjs            # -> dist/index.js (OpenClaw runtimeExtensions artifact)
+
+# 3. install the plugin into OpenClaw and verify via /tools (see docs/INTEGRATIONS)
+```
+
+## Documentation (split)
+
+- **docs/QUICKSTART** — first run & install
+- **docs/CONFIGURATION** — .env & plugin config
+- **docs/ARCHITECTURE-v2** — design & capabilities
+- **docs/INTEGRATIONS** — installing into OpenClaw / ClawHub
+- **docs/OPERATIONS** — ops, security, troubleshooting
+- **docs/CUA-EXECUTION** — desktop/vision via cua-driver
+
+## Security
+
+Fail-closed by design (inherited from ODSH-Bridge): argv allowlist in `exec.mjs`, tool-name whitelists, no real tokens committed, `tests/security.test.mjs` blocks tracked personal identifiers / secrets. See docs/OPERATIONS §Security.
+
+## License
+
+MIT — see LICENSE.
+
+## Credits
+
+- Built on **OpenClaw** (plugin SDK, `agent exec`, session-spawn).
+- Desktop/vision: **cua-driver** (trycua/cua) — `odsh.cua` just spawns it locally.
+
+---
+
+_English is the primary language; a Chinese translation is at [README.zh.md](README.zh.md)._ &nbsp; Roadmap: [ROADMAP.md](ROADMAP.md)

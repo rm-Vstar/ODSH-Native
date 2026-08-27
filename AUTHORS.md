@@ -1,0 +1,24 @@
+# Authors
+
+ODSH-Native is a host-side evolution of the ODSH-Bridge integration between
+**DeepSeek Harness (DSH)** and **OpenClaw**: it rebundles DSH's execution and
+plugin/capability surface as a first-class OpenClaw plugin.
+
+## Maintainer / Owner
+
+- **MikoRibbit** (owner / operator / human decision-maker)
+
+## Contributor
+
+- **rm-Vstar**
+  - Refactored ODSH-Native from a standalone bridge into a native OpenClaw plugin
+    (`openclaw/plugin-sdk/tool-plugin` `defineToolPlugin`), A-class agent tools
+    (exec/cua/visual/serve) and B-class resident services (watcher/scheduler + DSH
+    worker bridge).
+  - Verified plugin load + register + round-trip execution under the real OpenClaw SDK.
+  - Host-side fix for Windows ESM plugin loading (`pathToFileURL`).
+
+## With thanks to
+
+- **OpenClaw** — plugin SDK and `agent exec` / session-spawn mechanisms that let
+  a plugin carry DSH capabilities while keeping a clean sub-agent model.

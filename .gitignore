@@ -1,6 +1,23 @@
-.env
-*.local
+# Dependencies / build
 node_modules/
-target/
+dist/
+*.tsbuildinfo
+
+# Environment & secrets (never commit)
+.env
+.env.*
+!.env.example
+*.local
+
+# OSDH runtime state
 .dsh/
+*.db
+*.log
+daemon.log
+
+# OS / editor
+.DS_Store
 __pycache__/
+Thumbs.db
+.idea/
+.vscode/
