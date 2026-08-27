@@ -1,0 +1,60 @@
+{
+  "id": "odsh-native",
+  "name": "ODSH-Native",
+  "description": "Bring DeepSeek Harness (DSH) execution + plugin/capability surface natively into OpenClaw: A-class agent tools (exec/cua/visual/file + DSH-style plugins) and B-class resident services (auto-watch/scheduler + hosting select DSH Harness plugins).",
+  "version": "2.0.0",
+  "contracts": {
+    "tools": [
+      "odsh.exec",
+      "odsh.cua",
+      "odsh.visual",
+      "odsh.serve"
+    ]
+  },
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "pluginsDir": {
+        "type": "string",
+        "description": "Path to DSH-style plugin directory",
+        "default": "plugins"
+      },
+      "watch": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Paths to auto-watch"
+          }
+        }
+      },
+      "dshWorker": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "internal",
+              "remote"
+            ],
+            "default": "internal"
+          },
+          "endpoint": {
+            "type": "string",
+            "description": "Remote DSH Harness endpoint if mode=remote"
+          }
+        }
+      }
+    }
+  }
+}
