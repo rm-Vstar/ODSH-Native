@@ -5,7 +5,7 @@
   "type": "module",
   "engines": { "node": ">=18" },
   "scripts": {
-    "check": "node --check src/*.mjs && echo ALL_SYNTAX_OK",
+    "check": "node --check src/*.mjs && node --check src/worker/*.mjs && node --check src/gateway/*.mjs && node --check src/tools/*.mjs && echo ALL_SYNTAX_OK",
     "test": "node tests/*.test.mjs",
     "worker": "node src/worker/clean-exec.mjs",
     "tools": "node src/registry.mjs list"
