@@ -1,0 +1,14 @@
+{
+  "name": "odsh-native",
+  "version": "0.1.0",
+  "description": "ODSH-Native — bring DSH's plugin/capability surface natively into OpenClaw on a host (no Windows Node + SSH bridge, no second LLM). Node/TS, local CUA, clean sub-agent via agent exec.",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "check": "node --check src/*.mjs && echo ALL_SYNTAX_OK",
+    "test": "node tests/*.test.mjs",
+    "worker": "node src/worker/clean-exec.mjs",
+    "tools": "node src/registry.mjs list"
+  },
+  "license": "MIT"
+}

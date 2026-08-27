@@ -1,0 +1,7 @@
+{
+  "name": "example-plugin",
+  "version": "0.1.0",
+  "tools": [
+    { "name": "echo", "impl": "tool.mjs", "description": "Echo back the input (example plugin)" }
+  ]
+}
