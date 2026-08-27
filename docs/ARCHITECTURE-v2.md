@@ -98,8 +98,8 @@ ODSH-Native/
 - [x] src/runtime/{exec,cua,visual,dsh-worker}.mjs: A 类执行工具 + B 类 DSH worker 桥 (internal/remote)
 - [x] src/services/{watcher,scheduler}.mjs: B 类常驻后台服务
 - [x] scripts/build.mjs -> dist/index.js (runtimeExtensions 产物, 可 import)
-- [x] 测试: registry(3)+runtime(2)+services(2)+dsh-worker(2)=9 全 PASS; check ALL_SYNTAX_OK(22)
+- [x] 测试: 11 cases 全 PASS (registry3+runtime2+services2+dsh-worker2+plugin-load2); check ALL_SYNTAX_OK(23+)
 - [ ] 真连 DSH 后端 (DSH_WORKER_ENDPOINT) 端到端 (internal 已验证)
-- [ ] 真 OpenClaw 宿主加载 (需 peer openclaw 环境)
+- [x] 真 OpenClaw plugin-sdk 加载验证: 用 npm openclaw@2026.7.1-2 的 plugin-sdk/tool-plugin 加载 plugin, 注册 4 tools 并真实执行 odsh.exec(round-trip ok) -- 本环境已实证
 
 ---
