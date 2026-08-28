@@ -17,8 +17,9 @@ Operational notes for keeping ODSH-Native healthy.
 
 ## Known limitations
 
-- `odsh.visual` OCR / multimodal backend is a stub (needs a real vision model).
-- `odsh.serve` remote mode needs a reachable `DSH_WORKER_ENDPOINT` (internal mode verified).
+- `odsh.visual` has local OCR via tesseract + cua-driver capture; a **multimodal** description backend (external model) still needs work when no local OCR exists.
+- `odsh.serve` remote mode needs a reachable `DSH_WORKER_ENDPOINT` (internal mode verified); remote auth via optional `DSH_WORKER_TOKEN`.
+- Internal `odsh.serve` without a `cmd` reports `{ok:false}` by design (no in-process DSH task execution).
 - Full host OpenClaw load (peer `openclaw` package + real session) not yet verified end-to-end in a host environment.
 
 ## Security post-hold
