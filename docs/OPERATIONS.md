@@ -8,7 +8,7 @@
 
 ## Security
 
-- Fail-closed: argv allowlist in `runtime/exec.mjs`, tool-name whitelist in `runtime/cua.mjs`.
+- Fail-closed: shell-free `execFile` (no shell) in `runtime/exec.mjs`, tool-name whitelist in `runtime/cua.mjs`, plugin `impl` path containment in `registry.mjs`, optional `DSH_WORKER_TOKEN` Bearer auth for remote worker.
 - No real tokens/keys committed; `tests/security.test.mjs` blocks tracked personal identifiers & secrets.
 - `openclaw` is supplied by the host (peer), never bundled.
 

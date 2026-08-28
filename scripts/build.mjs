@@ -3,10 +3,10 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 const here = dirname(fileURLToPath(import.meta.url));
-const root = here + "/..";
-mkdirSync(root + "/dist", { recursive: true });
+const root = join(here, "..");
+mkdirSync(join(root, "dist"), { recursive: true });
 
 // We output a JS entry that re-exports the runtime modules and registers tools.
 // index.ts itself type-strips under node --experimental-strip-types, so we emit
@@ -37,6 +37,6 @@ export function createPlugin(config = {}) {
 
 export default { createPlugin };
 `;
-writeFileSync(root + "/dist/index.js", js);
-execFileSync(process.execPath, ["--check", root + "/dist/index.js"]);
+writeFileSync(join(root, "dist", "index.js"), js);
+execFileSync(process.execPath, ["--check", join(root, "dist", "index.js")]);
 console.log("dist/index.js written + syntax OK");

@@ -10,7 +10,9 @@ export async function t_serve_internal() {
 }
 
 export async function t_serve_no_cmd() {
+  // Without a command (and with no remote endpoint) internal serve cannot execute a
+  // DSH task, so it must report the truth ({ok:false}) rather than fake an echo.
   const r = await spawnDSHWorker({ task: "just-task" });
-  if (!r.ok) throw new Error("runner serve failed: " + JSON.stringify(r));
-  return "odsh.serve no-cmd ok";
+  if (r.ok) throw new Error("expected ok:false for no-cmd internal serve, got " + JSON.stringify(r));
+  return "odsh.serve no-cmd ok (truthful)";
 }

@@ -42,7 +42,7 @@ node scripts/build.mjs            # -> dist/index.js (OpenClaw runtimeExtensions
 
 ## 安全
 
-默认 fail-closed（承袭 ODSH-Bridge）：`exec.mjs` 的 argv 白名单、工具名白名单、不提交真实 token、`tests/security.test.mjs` 拦截被跟踪的个人标识符/密钥。见 docs/OPERATIONS §安全。
+默认 fail-closed（承袭 ODSH-Bridge）：`exec.mjs` 用无 shell 的 `execFile`、工具名白名单、插件加载的路径遏制、远程 worker 可选 Bearer 鉴权、不提交真实 token、`tests/security.test.mjs` 拦截被跟踪的个人标识符/密钥。见 docs/OPERATIONS §安全。
 
 ## 许可
 

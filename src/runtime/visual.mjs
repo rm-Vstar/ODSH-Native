@@ -6,9 +6,8 @@
 // actionable payload (path + image info + note) instead of pretending OCR succeeded.
 import { execFile, spawnSync } from 'node:child_process';
 import { promisify } from 'node:util';
-import { stat } from 'node:fs/promises';
+import { stat, readdir, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 
 const run = promisify(execFile);
@@ -35,12 +34,23 @@ async function ocrWithTesseract(imagePath, bin) {
   }
 }
 
+// Reused (not growing) scratch dir so captures do not leak one temp dir per call.
+const CAP_DIR = join(tmpdir(), 'odsh-visual');
 async function captureScreenshot(cuaPath) {
-  const dir = await mkdtemp(join(tmpdir(), 'odsh-visual-'));
-  const out = join(dir, 'desktop.png');
+  await mkdir(CAP_DIR, { recursive: true });
+  const out = join(CAP_DIR, 'desktop-' + process.pid + '-' + Date.now() + '.png');
   try {
+    // Invoke cua-driver; we cannot rely on where it writes its frame, so after the
+    // call we verify an image actually exists before claiming success (never fake it).
     await run(cuaPath, ['get_desktop_state'], { timeout: 60000, maxBuffer: 64 * 1024 * 1024 });
-    return { ok: true, path: out };
+    let found = null;
+    try { if ((await stat(out)).isFile()) found = out; } catch { /* not there */ }
+    if (!found) {
+      const names = (await readdir(CAP_DIR)).filter((n) => /\.(png|jpe?g|webp)$/i.test(n));
+      if (names.length) found = join(CAP_DIR, names[names.length - 1]);
+    }
+    if (!found) return { ok: false, error: 'cua-driver ran but produced no image file' };
+    return { ok: true, path: found };
   } catch (e) {
     return { ok: false, error: e.stderr || e.message };
   }

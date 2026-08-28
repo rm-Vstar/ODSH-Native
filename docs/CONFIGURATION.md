@@ -11,6 +11,7 @@ ODSH-Native is configured through `.env` (see `.env.example`) and the OpenClaw p
 | `OC_TOKEN` | gateway.auth.token | _required_ |
 | `OC_KEYS` | Ed25519 device JWK file | auto-generate first run |
 | `DSH_WORKER_ENDPOINT` | Remote DSH worker (mode=remote); empty = internal | _(empty)_ |
+| `DSH_WORKER_TOKEN` | Bearer token sent to the remote worker (recommended when remote) | _(empty)_ |
 | `CUA_DRIVER` | cua-driver binary | `cua-driver` |
 
 ## Plugin config (openclaw.plugin.json configSchema)

@@ -20,5 +20,5 @@ Follow docs/INTEGRATIONS for host-side install and verifying via /tools.
 ## What you get
 - `odsh.exec` — run a local command.
 - `odsh.cua` — drive cua-driver (screenshot / click / browser).
-- `odsh.visual` — describe a screenshot (OCR stubbed).
+- `odsh.visual` — describe a screenshot (local OCR via tesseract when available; otherwise a truthful no-render note, not a fake OCR).
 - `odsh.serve` — execute in a DSH Harness worker (internal/remote).

@@ -7,7 +7,8 @@
 - [x] Native OpenClaw plugin skeleton (A-class agent tools + B-class resident services).
 - [x] Real OpenClaw plugin-sdk load + round-trip validation.
 - [ ] Full host OpenClaw install & verify via /tools.
-- [ ] `odsh.visual` real OCR / vision backend.
+- [x] `odsh.visual` local OCR via tesseract + cua-driver capture (truthful no-render note when no backend).
+- [ ] `odsh.visual` multimodal description backend (external model) for when no local OCR exists.
 - [ ] ClawHub publish as an installable plugin package.
 
 ## Phase 1 - DSH Harness hosting

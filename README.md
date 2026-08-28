@@ -43,7 +43,7 @@ node scripts/build.mjs            # -> dist/index.js (OpenClaw runtimeExtensions
 
 ## Security
 
-Fail-closed by design (inherited from ODSH-Bridge): argv allowlist in `exec.mjs`, tool-name whitelists, no real tokens committed, `tests/security.test.mjs` blocks tracked personal identifiers / secrets. See docs/OPERATIONS §Security.
+Fail-closed by design (inherited from ODSH-Bridge): shell-free `execFile` (no shell) in `exec.mjs`, tool-name whitelists, path-containment in the registry, optional Bearer auth for the remote worker, no real tokens committed, and `tests/security.test.mjs` blocks tracked personal identifiers / secrets. See docs/OPERATIONS §Security.
 
 ## License
 
