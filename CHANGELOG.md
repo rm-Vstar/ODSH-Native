@@ -2,6 +2,21 @@
 
 All notable changes to ODSH-Native are documented here. Format: Keep a Changelog.
 
+## [2.0.4] - 2026-08-28
+
+**Optional remote CUA mode (docker → host desktop via cua-computer-server).**
+
+### Added
+
+- `CUA_REMOTE` env selects a **remote** CUA backend: `odsh.cua` and `odsh.visual` now talk to a `cua-computer-server` over HTTP (`POST /cmd`, SSE) when set, e.g. `CUA_REMOTE=http://host.docker.internal:8000`. Empty keeps the local `cua-driver` path (host install, simplest).
+- `odsh.visual` no-path capture works in remote mode too: fetches `get_desktop_state`, persists base64 images under `<tmpdir>/odsh-visual/`, then runs local OCR.
+- Remote mode is fail-closed: http(s)-only URL, tool/key whitelist, remote failures surface as `{ok:false}`.
+- Tests: `tests/cua.test.mjs` covers remote/local selection, invalid URL, bad argv key, unreachable remote, and local invalid-tool rejection (each in a subprocess to pick up env per-mode).
+
+### Changed
+
+- docs/CUA-EXECUTION (EN+zh) documents both modes incl. the OpenClaw `mcp set` option and a host-side computer-server launch snippet.
+
 ## [2.0.3] - 2026-08-28
 
 **Fix: dist entry now carries the OpenClaw plugin contract (register) — plugin is loadable-capability again.**

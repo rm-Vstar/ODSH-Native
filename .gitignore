@@ -18,6 +18,9 @@ daemon.log
 # ClawHub / Plugin Inspector reports
 reports/
 
+# test-built probe artifacts
+tests/_cua_probe.mjs
+
 # OS / editor
 .DS_Store
 __pycache__/
