@@ -3,6 +3,18 @@
 
 > **[ClawHub](https://clawhub.ai): `odsh-native`** · _source-linked · pluginApi ≥ 2026.3.24-beta_ · _owner: see ClawHub_
 
+**[ClawHub install](#-install-from-clawhub) · [Source install](#-install-from-source-developers) · [Docs](#-documentation)**
+
+**What it does** — ODSH-Native turns your OpenClaw agent into a **DeepSeek Harness (DSH) execution plane**:
+
+- **Run real commands** on the host via `odsh.exec` (shell-free, fail-closed).
+- **Control the desktop** with `odsh.cua` — click, type, browse via `cua-driver`, no focus steal.
+- **Understand screens / images** with `odsh.visual` — local OCR via tesseract.
+- **Dispatch work to a DSH / Cordis worker** with `odsh.serve` (local subprocess or remote HTTP).
+- **Add DSH-style tool plugins** and run **resident watcher / scheduler** services.
+
+No second LLM, no Windows-Node + SSH bridge, no Docker — just an OpenClaw plugin.
+
 ODSH-Native rebundles the [ODSH-Bridge](https://github.com/Mikoribbit/odsh-bridge) idea into an **open-source OpenClaw plugin**. Instead of wiring two containers and a file-envelope bridge, it packages DeepSeek Harness (DSH) execution and a plugin/capability surface as a first-class OpenClaw agent tool plane — **no second LLM, no Windows-Node + SSH bridge, no Docker requirement.**
 
 ---

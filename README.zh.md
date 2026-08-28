@@ -3,6 +3,18 @@
 
 > **[ClawHub](https://clawhub.ai)：`odsh-native`** · _source-linked · pluginApi ≥ 2026.3.24-beta_ · _属主：见 ClawHub_
 
+**[ClawHub 安装](#-从-clawhub-安装) · [源码安装](#-从源码安装开发者) · [文档](#-文档)**
+
+**它能做什么** — ODSH-Native 把你的 OpenClaw agent 变成一个 **DeepSeek Harness（DSH）执行平面**：
+
+- 通过 `odsh.exec` 在宿主上**执行真实命令**（无 shell、fail-closed）。
+- 通过 `odsh.cua` **控制桌面**——点击、输入、浏览器（基于 `cua-driver`，不抢焦点）。
+- 通过 `odsh.visual` **理解屏幕/图片**——基于 tesseract 的本地 OCR。
+- 通过 `odsh.serve` 把任务**派发给 DSH/Cordis worker**（本地子进程或远程 HTTP）。
+- **挂载 DSH 风格工具插件**，并运行**常驻 watcher/scheduler** 服务。
+
+无需第二 LLM、无需 Windows-Node + SSH 桥、无需 Docker——只是一个 OpenClaw 插件。
+
 ODSH-Native 把 [ODSH-Bridge](https://github.com/Mikoribbit/odsh-bridge) 的思路重打包为一个**开源 OpenClaw 插件**。不再需要两个容器 + 文件信封桥，而是把 DeepSeek Harness（DSH）的执行能力与插件/能力面，做成 OpenClaw 的**一等 agent 工具平面**——**无需第二个 LLM、无需 Windows-Node + SSH 桥、无需 Docker。**
 
 ---
