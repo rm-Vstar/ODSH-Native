@@ -2,6 +2,24 @@
 
 All notable changes to ODSH-Native are documented here. Format: Keep a Changelog.
 
+## [2.0.5] - 2026-08-28
+
+**README rebuild (EN/zh top-level language switch, docker→host remote-CUA + web-search sections, env sample).**
+
+### Added
+
+- Top-level English/Chinese language switch (mirrors the ODSH-Bridge for Docker README) plus badges, TOC, and richer sections.
+- New Docker → host desktop (remote CUA) section: host prerequisites (cua-driver + cua-computer-server), container-side options (CUA_REMOTE env or OpenClaw mcp set cua-driver streamable-http), security note (no built-in token).
+- New Web search (SERPdive + TinyFish, smart selection) section: engine table, selection rule (SERPdive for answers, TinyFish Search for raw results, TinyFish Fetch for full pages), one-line curl wiring, both free.
+- .env.example: CUA_REMOTE, SERPDIVE_API_KEY, TINYFISH_API_KEY.
+
+### Changed
+
+- README.md / README.zh.md restructured to match the ODSH-Bridge format.
+
+## [2.0.4] - 2026-08-28
+All notable changes to ODSH-Native are documented here. Format: Keep a Changelog.
+
 ## [2.0.4] - 2026-08-28
 
 **Optional remote CUA mode (docker → host desktop via cua-computer-server).**
