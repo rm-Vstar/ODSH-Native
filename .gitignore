@@ -15,6 +15,9 @@ dist/
 *.log
 daemon.log
 
+# ClawHub / Plugin Inspector reports
+reports/
+
 # OS / editor
 .DS_Store
 __pycache__/

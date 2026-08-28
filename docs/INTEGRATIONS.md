@@ -6,10 +6,15 @@
 2. Verify `/tools` lists `odsh.exec`, `odsh.cua`, `odsh.visual`, `odsh.serve`.
 3. `npm run check` + `npm test` run the self-tests.
 
-## ClawHub / package publish (future)
+## Install from ClawHub (published)
 
-- Bundle as a plugin package and publish to ClawHub; `openclaw plugins install clawhub:<pkg>`.
-- Not yet published (see docs/OPERATIONS).
+The plugin is **published to ClawHub** as `odsh-native`:
+
+```bash
+openclaw plugins install clawhub:odsh-native --acknowledge-clawhub-risk
+```
+
+`--acknowledge-clawhub-risk` confirms the release-scan's `suspicious` trust label, which is expected for a high-privilege local-exec/desktop plugin (fail-closed by design). Verify via `/tools`.
 
 ## Cua desktop/vision
 

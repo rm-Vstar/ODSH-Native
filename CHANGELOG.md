@@ -2,6 +2,24 @@
 
 All notable changes to ODSH-Native are documented here. Format: Keep a Changelog.
 
+## [2.0.2] - 2026-08-28
+
+**Published to ClawHub; docs polish; security-scan consent.**
+
+### Added
+
+- **ClawHub install option** in README (EN + zh): `openclaw plugins install clawhub:odsh-native --acknowledge-clawhub-risk`. Package published to ClawHub as `odsh-native`.
+- docs/INTEGRATIONS updated to reflect the plugin is published (was "future / not yet published").
+
+### Changed
+
+- Reworked README.md / README.zh.md for readability (feature table, emoji section headers, docs table, risk-note for the ClawHub trust flag).
+- `package.json` / `openclaw.plugin.json` version bump 2.0.1 → 2.0.2.
+
+### Fixed
+
+- security.test.mjs: strip the authorized public `github.com/mikoribbit/odsh-bridge` upstream URL before the identifier scan, so a link to the public upstream repo is not misread as a leaked handle.
+
 ## [2.0.1] - 2026-08-28
 
 **Hardening round: audit-driven bug fixes, path/safety hardening, docs sync.**
