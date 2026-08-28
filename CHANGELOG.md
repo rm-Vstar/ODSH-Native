@@ -2,6 +2,16 @@
 
 All notable changes to ODSH-Native are documented here. Format: Keep a Changelog.
 
+## [2.0.3] - 2026-08-28
+
+**Fix: dist entry now carries the OpenClaw plugin contract (register) — plugin is loadable-capability again.**
+
+### Fixed
+
+- `scripts/build.mjs` previously emitted a hand-written `createPlugin` entry into `dist/index.js`, which OpenClaw loads as `runtimeExtensions` and rejected as **non-capability** (`missing register/activate export`). The four agent tools therefore did not register on install.
+- Now `build.mjs` re-emits `src/index.ts` (the `defineToolPlugin` product) with only the import paths remapped (`./runtime` / `./services` → `../src/runtime` / `../src/services`), so `dist/index.js` carries `id/name/description/configSchema/register` — matching the load contract.
+- Added `tests/plugin-load.test.mjs::t_dist_entry_matches_contract` asserting `dist/index.js` registers all 4 tools, guarding against regression.
+
 ## [2.0.2] - 2026-08-28
 
 **Published to ClawHub; docs polish; security-scan consent.**

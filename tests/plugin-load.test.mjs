@@ -32,3 +32,22 @@ export async function t_plugin_exec_roundtrip() {
   if (!/PLUGIN_EXEC_OK/.test(out)) throw new Error("exec did not run through plugin: " + out.slice(0,80));
   return "odsh.exec round-trip ok";
 }
+
+export async function t_dist_entry_matches_contract() {
+  // The runtime artifact (dist/index.js) is what OpenClaw actually loads (runtimeExtensions).
+  // It must carry the SAME defineToolPlugin product as src/index.ts, i.e. a register().
+  let distEntry = null;
+  try {
+    const mod = await import("../dist/index.js");
+    distEntry = mod.default;
+  } catch (e) {
+    return "SKIP: dist not built (" + e.message + ")";
+  }
+  if (!distEntry || typeof distEntry.register !== "function") throw new Error("dist entry missing register() - OpenClaw would load it as non-capability");
+  const registered = [];
+  const mockApi = { registerTool(spec, opts) { registered.push({ spec, opts }); }, pluginConfig: {} };
+  distEntry.register(mockApi);
+  const names = registered.map(r => (r.spec && r.spec.name) || r.spec);
+  if (names.length < 4 || !names.includes("odsh.exec")) throw new Error("dist did not register tools: " + names.join(","));
+  return "dist registers: " + names.join(", ");
+}
