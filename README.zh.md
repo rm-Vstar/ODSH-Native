@@ -81,20 +81,26 @@ node scripts/build.mjs            # -> dist/index.js
 
 当 **OpenClaw 跑在容器里**、而真实桌面在 Windows/macOS **宿主**上时，把插件指向宿主上的 `cua-computer-server`。这是**可选项**——`CUA_REMOTE` 为空时插件继续用**本地** `cua-driver`（宿主安装最简）。
 
-### 前置（宿主侧，一次性）
+### 前置（宿主侧，一次性）——必须开一个端口
 
-1. 安装 cua-driver（https://github.com/trycua/cua），Windows PowerShell：
+远程 CUA 需要宿主上运行 `cua-computer-server`，并把它的 HTTP 端口（默认 `8000`）暴露给容器。
+**没有服务 → `odsh.cua`/`odsh.visual` 返回 `{ok:false, error:"fetch failed"}`**；只设
+`CUA_REMOTE` 不够。
+
+1. 在交互会话安装并启动 server —— **PyPI `cua-computer-server` 0.1.25**（2026-08 实测；
+   自带 ODSH-Native 所需的 `POST /cmd` + SSE 协议；**无需 `[driver]` extra**）：
 
 ```powershell
-irm https://cua.ai/driver/install.ps1 | iex
+pip install cua-computer-server
+python -m computer_server --host 0.0.0.0 --port 8000
 ```
 
-2. 在交互会话启动官方 computer-server 以暴露 cua-driver：
+   > GitHub 主线参数（`--backend cua-driver --capture-scope desktop` 和 `[driver]` extra）
+   > 仅 **trycua 主线**支持——PyPI 0.1.25 会拒绝（`unrecognized arguments`）。`--host 0.0.0.0`
+   > 必须要有，容器才能访问该端口。Windows 上 `No module named 'win32api'` 只是警告
+   > （`pip install pywin32` 可消除）。
 
-```powershell
-pip install "cua-computer-server[driver]"
-python -m computer_server --backend cua-driver --capture-scope desktop --host 0.0.0.0 --port 8000
-```
+2. 先自检：`curl http://localhost:8000/status` → `{"status":"ok",...}`。
 
 ### 容器侧——二选一
 
@@ -104,7 +110,13 @@ python -m computer_server --backend cua-driver --capture-scope desktop --host 0.
 CUA_REMOTE=http://host.docker.internal:8000
 ```
 
-odsh.cua 与 odsh.visual（无 path 截图）即通过 `POST /cmd`（SSE）操作宿主桌面；截图落盘到 `<tmpdir>/odsh-visual/`。
+⚠️ **设置后必须完整重启容器**——gateway 热重载不会重新读环境变量，插件会继续走本地模式
+（报 `spawn cua-driver ENOENT`）。
+
+odsh.cua 与 odsh.visual（无 path 截图）即通过 `POST /cmd`（SSE）操作宿主桌面；odsh.visual
+在 Linux 上把帧存到 `/dev/shm/odsh-visual`（tmpfs 内存盘，不碰持久盘；可用 `ODSH_VISUAL_DIR`
+覆盖），装有 tesseract 时直接一步 OCR 返回 `text`（无需外部视觉模型）。截图会先试
+`get_desktop_state`（trycua 主线），失败再回退 `screenshot`（PyPI 0.1.25）。
 
 **方式 B：经 OpenClaw 原生 MCP（无需插件代码）**：
 

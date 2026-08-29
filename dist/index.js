@@ -17,8 +17,8 @@ export default defineToolPlugin({
   tools() {
     return [
       { name: "odsh.exec", description: "Execute a local command (fail-closed argv).", parameters: { type: "object", properties: { cmd: { type: "string" }, args: { type: "array", items: { type: "string" } }, cwd: { type: "string" } }, required: ["cmd"] }, execute: async (params) => execTool(params || {}) },
-      { name: "odsh.cua", description: "Drive local CUA (cua-driver): image/click/browser, no focus steal.", parameters: { type: "object", properties: { tool: { type: "string" }, args: { type: "object" } }, required: ["tool"] }, execute: async (params) => runCua(params || {}) },
-      { name: "odsh.visual", description: "Describe a screenshot/image (OCR/vision).", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] }, execute: async (params) => describeVisual(params || {}) },
+      { name: "odsh.cua", description: "Drive CUA (cua-driver / cua-computer-server): image/click/browser, no focus steal. Local mode spawns cua-driver; remote mode requires CUA_REMOTE (host must run computer-server on the port).", parameters: { type: "object", properties: { tool: { type: "string" }, args: { type: "object" } }, required: ["tool"] }, execute: async (params) => runCua(params || {}) },
+      { name: "odsh.visual", description: "Describe a screenshot/image (OCR/vision): pass a path, or capture a live frame (requires cua-driver or a remote computer-server on CUA_REMOTE) and OCR it with tesseract if present.", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] }, execute: async (params) => describeVisual(params || {}) },
       // odsh.serve mirrors the worker contract (src/runtime/dsh-worker.mjs): internal mode
       // needs a command + args; remote mode (DSH_WORKER_ENDPOINT set) dispatches the task
       // object to the remote worker. Secrets (endpoints/tokens) stay OUT of the schema.

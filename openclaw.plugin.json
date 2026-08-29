@@ -2,7 +2,7 @@
   "id": "odsh-native",
   "name": "ODSH-Native",
   "description": "Bring DeepSeek Harness (DSH) execution + plugin/capability surface natively into OpenClaw: A-class agent tools (exec/cua/visual/file + DSH-style plugins) and B-class resident services (auto-watch/scheduler + hosting select DSH Harness plugins).",
-  "version": "2.0.6",
+  "version": "2.0.7",
   "contracts": {
     "tools": [
       "odsh.exec",

@@ -91,17 +91,23 @@ When **OpenClaw runs in a container** but the real desktop lives on the Windows/
 the plugin at a `cua-computer-server` on the host. This is optional — with `CUA_REMOTE` empty the
 plugin keeps using a **local** `cua-driver` (simplest for host installs).
 
-### Prerequisites (host side, one-time)
+### Prerequisites (host side, one-time) — a port must be open
 
-1. Install cua-driver (https://github.com/trycua/cua), Windows PowerShell:
+Remote CUA needs a `cua-computer-server` running on the host with its HTTP port (default
+`8000`) reachable from the container. **No server → `odsh.cua`/`odsh.visual` answer
+`{ok:false, error:"fetch failed"}`**; `CUA_REMOTE` alone is not enough.
+
+1. Start the server in an interactive host session — **PyPI `cua-computer-server` 0.1.25**
+   (verified 2026-08; speaks the exact `POST /cmd` + SSE protocol; **no `[driver]` extra**):
 ```powershell
-irm https://cua.ai/driver/install.ps1 | iex
+pip install cua-computer-server
+python -m computer_server --host 0.0.0.0 --port 8000
 ```
-2. Start the official computer-server exposing cua-driver (interactive session):
-```powershell
-pip install "cua-computer-server[driver]"
-python -m computer_server --backend cua-driver --capture-scope desktop --host 0.0.0.0 --port 8000
-```
+   > The GitHub-mainline flags (`--backend cua-driver --capture-scope desktop` and the
+   > `[driver]` extra) are **trycua 主线 only** — PyPI 0.1.25 rejects them. `--host 0.0.0.0` is
+   > required so the container can reach the port. `No module named 'win32api'` on Windows is a
+   > harmless warning (`pip install pywin32` silences it).
+2. Sanity-check it: `curl http://localhost:8000/status` → `{"status":"ok",...}`.
 
 ### Container side — pick one
 
@@ -111,8 +117,14 @@ python -m computer_server --backend cua-driver --capture-scope desktop --host 0.
 CUA_REMOTE=http://host.docker.internal:8000
 ```
 
+⚠️ **A full container restart is required after setting it** — gateway hot-reload does not
+re-read the environment, so the plugin keeps trying local mode (`spawn cua-driver ENOENT`).
+
 `odsh.cua` and `odsh.visual` (no-path capture) then talk to the host desktop over
-`POST /cmd` (SSE); screenshots persist to `<tmpdir>/odsh-visual/`.
+`POST /cmd` (SSE); `odsh.visual` keeps frames in `/dev/shm/odsh-visual` on Linux (in-RAM, no
+persistent-disk writes; override via `ODSH_VISUAL_DIR`) and OCR-fast-paths them with tesseract
+when installed (returns `text` in one shot, no external vision model). The capture probes
+`get_desktop_state` (trycua 主线) first and falls back to `screenshot` (PyPI 0.1.25).
 
 **Option B — via OpenClaw native MCP (no plugin code needed)**:
 

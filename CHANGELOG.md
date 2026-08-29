@@ -4,6 +4,35 @@ All notable changes to ODSH-Native are documented here. Format: Keep a Changelog
 
 ## [Unreleased]
 
+**CUA 打通 validation round (2026-08-29, from the Docker→host CUA integration summary)**.
+
+### Added
+
+- `odsh.visual` capture fast-path: a fresh live frame is now **OCR-featured in the same call**
+  (tesseract) when no image path is given — one-shot `{ok, text, path}` instead of save-then-
+  describe. See docs/CUA-EXECUTION.
+- Remote capture now **probes both computer-server lines**: `get_desktop_state` (trycua 主线)
+  first, falling back to `screenshot` (PyPI `cua-computer-server` 0.1.25, openinterpreter 系)
+  on 4xx / no-image. Response parser (`parseRemoteScreenshot`, exported for tests) accepts
+  both `images[]` and `image_data` shapes and fails closed on `success:false` / no data.
+- Captures go to `/dev/shm/odsh-visual` on Linux (tmpfs — in RAM, no persistent-disk write),
+  falling back to the OS tmp dir elsewhere; override with `ODSH_VISUAL_DIR`.
+
+### Docs
+
+- `docs/CUA-EXECUTION(.zh).md` rewritten: host prerequisite now states **a port must be open**
+  (no server → `fetch failed`), the verified PyPI 0.1.25 command (`pip install
+  cua-computer-server` + `python -m computer_server --host 0.0.0.0 --port 8000`, no `[driver]`
+  extra, no GitHub-mainline flags), the 0.1.25 ↔ trycua command map, and the **full restart
+  required** note for `CUA_REMOTE` via `env.vars` (hot-reload does not re-read env).
+- README (EN/zh) host prerequisite updated to the same verified 0.1.25 instructions + restart
+  caveat; `odsh.visual`/`odsh.cua` tool descriptions in `src/index.ts` now state the
+  computer-server prerequisite explicitly for agents.
+
+**Security hardening + robustness round (2026-08-29):** see below.
+
+---
+
 **Audit round 2026-08-29 (round 2): security hardening + robustness.**
 
 ### Security

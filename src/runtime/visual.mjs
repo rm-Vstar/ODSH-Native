@@ -7,6 +7,7 @@
 import { execFile, spawnSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { stat, readdir, mkdir, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -14,7 +15,10 @@ const run = promisify(execFile);
 const TESS = process.env.TESSERACT_BIN || 'tesseract';
 const CUA = process.env.CUA_DRIVER || 'cua-driver';
 const REMOTE = process.env.CUA_REMOTE || ''; // http://host.docker.internal:8000 for docker->host
-const CAP_DIR = join(tmpdir(), 'odsh-visual');
+// In-memory-first scratch dir: /dev/shm (tmpfs) keeps captured frames off the persistent
+// disk on Linux; falls back to the OS tmp dir elsewhere. Override with ODSH_VISUAL_DIR.
+const SHM = (process.platform === 'linux' && existsSync('/dev/shm')) ? '/dev/shm/odsh-visual' : null;
+const CAP_DIR = process.env.ODSH_VISUAL_DIR || SHM || join(tmpdir(), 'odsh-visual');
 
 async function which(cmd) {
   const probes = process.platform === 'win32' ? [cmd, cmd + '.exe', cmd + '.cmd', cmd + '.bat'] : [cmd];
@@ -48,28 +52,52 @@ async function writeBase64Images(items) {
   return written;
 }
 
-// Remote capture via cua-computer-server /cmd (SSE). Uses the cua-driver backend's
-// get_desktop_state, which returns images[] with data_base64.
+// Parse a computer-server /cmd SSE payload into a uniform image list. Two response
+// shapes are accepted (see docs/CUA-EXECUTION.md §Command map):
+//   - trycua 主线 (get_desktop_state): {success, images: [{data_base64, mime_type}]}
+//   - PyPI 0.1.25 (openinterpreter 系, screenshot): {success, image_data: "<base64>"}
+// Exported as a pure function so tests can pin both formats.
+export function parseRemoteScreenshot(text) {
+  let images = null;
+  let single = null;
+  for (const line of String(text || '').split(/\r?\n/)) {
+    if (!line.startsWith('data: ')) continue;
+    let j = null;
+    try { j = JSON.parse(line.slice(6).trim()); } catch { continue; }
+    if (!j) continue;
+    if (j.success === false) return { ok: false, error: j.error || 'remote screenshot failed' };
+    if (Array.isArray(j.images) && j.images.length) { images = j.images; break; }
+    if (typeof j.image_data === 'string' && j.image_data) { single = j.image_data; break; }
+  }
+  if (images) return { ok: true, images };
+  if (single) return { ok: true, images: [{ data_base64: single, mime_type: 'image/png' }] };
+  return { ok: false, error: 'remote capture returned no image' };
+}
+
+// Remote capture via cua-computer-server /cmd (SSE). Tries the trycua 主线 command
+// first (get_desktop_state); if the server answers 4xx / no image (PyPI 0.1.25
+// openinterpreter 系 does not know it) falls back to the 0.1.25 `screenshot` name.
 async function remoteScreenshot() {
   const base = String(REMOTE).replace(/\/$/, '');
   if (!/^https?:\/\//.test(REMOTE)) return { ok: false, error: 'invalid CUA_REMOTE (must be http(s)://...)', remote: true };
-  try {
+  const attempt = async (command) => {
     const r = await fetch(base + '/cmd', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ command: 'get_desktop_state', params: {} }),
+      body: JSON.stringify({ command, params: {} }),
       signal: AbortSignal.timeout(60000),
     });
-    const text = await r.text();
-    if (!r.ok) return { ok: false, remote: true, status: r.status, error: text.slice(0, 2000) };
-    let images = [];
-    for (const line of text.split(/\r?\n/)) {
-      if (!line.startsWith('data: ')) continue;
-      let j = null; try { j = JSON.parse(line.slice(6).trim()); } catch { continue; }
-      if (j && Array.isArray(j.images) && j.images.length) { images = j.images; if (j.success === false) return { ok: false, remote: true, error: j.error || 'remote screenshot failed' }; break; }
+    return { status: r.status, text: await r.text() };
+  };
+  try {
+    let resp = await attempt('get_desktop_state');
+    let parsed = parseRemoteScreenshot(resp.text);
+    if (resp.status >= 400 || !parsed.ok) {
+      resp = await attempt('screenshot');
+      parsed = parseRemoteScreenshot(resp.text);
     }
-    if (!images.length) return { ok: false, remote: true, error: 'remote get_desktop_state returned no image' };
-    const written = await writeBase64Images(images);
+    if (!parsed.ok) return { ok: false, remote: true, error: parsed.error || 'remote capture failed (tried get_desktop_state + screenshot)' };
+    const written = await writeBase64Images(parsed.images);
     if (!written.length) return { ok: false, remote: true, error: 'could not persist remote screenshot' };
     return { ok: true, remote: true, path: written[written.length - 1] };
   } catch (e) {
@@ -112,16 +140,21 @@ export async function describeVisual({ path, image } = {}) {
 
   if (!src) {
     // Capture: prefer remote computer-server when CUA_REMOTE is set, else local cua-driver.
-    if (REMOTE) {
-      const shot = await remoteScreenshot();
-      return { ok: !!shot.ok, source: shot.ok ? 'capture' : 'none', remote: true, engine: 'computer-server', ...(shot.path ? { path: shot.path } : {}), note: shot.ok ? 'captured live desktop via computer-server' : (shot.error || 'remote capture unavailable'), ...(shot.error ? { error: shot.error } : {}) };
+    let shot = null;
+    let backend = null;
+    if (REMOTE) { shot = await remoteScreenshot(); backend = 'computer-server'; }
+    else { const cuaPath = await which(CUA); if (cuaPath) { shot = await localCaptureScreen(cuaPath); backend = 'cua-driver'; } }
+    if (!shot) return { ok: true, source: 'none', note: 'no image path given, no CUA_REMOTE, and no local cua-driver; pass an image path' };
+    if (!shot.ok) return { ok: false, source: 'capture', remote: shot.remote, engine: backend, error: shot.error || 'capture unavailable' };
+    // Fast-path: OCR the freshly captured frame in one call (scratch dir is /dev/shm
+    // tmpfs when available, so no persistent-disk write happens).
+    const tesseract = await which(TESS);
+    if (tesseract) {
+      const ocr = await ocrWithTesseract(shot.path, tesseract);
+      if (ocr.ok) return { ok: true, source: 'capture', remote: shot.remote, engine: 'tesseract', backend, path: shot.path, text: ocr.text, note: 'captured a live frame and OCR\'d it in one shot' };
+      return { ok: true, source: 'capture', remote: shot.remote, engine: backend, path: shot.path, note: 'captured a live frame; OCR produced no text — pass the path to a multimodal model', ...(ocr.error ? { ocrError: ocr.error } : {}) };
     }
-    const cuaPath = await which(CUA);
-    if (cuaPath) {
-      const shot = await localCaptureScreen(cuaPath);
-      return { ok: shot.ok, source: shot.ok ? 'capture' : undefined, engine: 'cua-driver', ...(shot.path ? { path: shot.path } : {}), note: shot.ok ? 'captured live desktop frame' : (shot.error || 'capture unavailable'), ...(shot.error ? { error: shot.error } : {}) };
-    }
-    return { ok: true, source: 'none', note: 'no image path given, no CUA_REMOTE, and no local cua-driver; pass an image path' };
+    return { ok: true, source: 'capture', remote: shot.remote, engine: backend, path: shot.path, note: 'captured a live frame; no local OCR backend — pass the path to a multimodal model' };
   }
 
   if (!st || !st.isFile()) {
