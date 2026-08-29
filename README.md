@@ -28,7 +28,6 @@
 - [Install from ClawHub](#install-from-clawhub)
 - [Install from source (developers)](#install-from-source-developers)
 - [Docker → host desktop (remote CUA)](#docker--host-desktop-remote-cua)
-- [Web search (SERPdive + TinyFish, smart selection)](#web-search-serpdive--tinyfish-smart-selection)
 - [Documentation](#documentation)
 - [Design & security](#design--security)
 - [Roadmap & keep in sync](#roadmap--keep-in-sync)
@@ -137,37 +136,6 @@ openclaw mcp set cua-driver '{"url":"http://host.docker.internal:8000/mcp","tran
 
 ---
 
-## Web search (SERPdive + TinyFish, smart selection) — *planned, not implemented*
-
-> **Status: PLANNED.** This release ships **no web-search implementation** — there is no
-> wire-up in `src/` (the `SERPDIVE_API_KEY` / `TINYFISH_API_KEY` entries in `.env.example`
-> are **reserved** so installing the plugin needs no `.env` churn later). The design below
-> documents the intended engine selection; nothing here is operational yet.
-
-| Engine | Strengths | When selected |
-|---|---|---|
-| **SERPdive** (serpdive.com) | "search-as-answer": one call returns distilled, LLM-ready answers (`answer` + per-source `content`) | Q&A / research-style queries that need an answer, not just links |
-| **TinyFish** (tinyfish.ai) | ranked search + **JS-rendered fetch** of full page bodies (markdown) | Raw content, SPA/JS-heavy pages, or when you need full page text |
-
-**Planned selection rule:** a thin router tries SERPdive first for answer-style queries; falls
-back to TinyFish Search when a query needs raw results, and TinyFish Fetch when the caller wants
-full page bodies (`urls[]`). Both are free at low volume (SERPdive: 1000 credits/mo incl. the
-free `krill` model; TinyFish: Search & Fetch free even at $0). No DeepSeek web-search balance is
-required.
-
-**Reserved wiring** (for a future implementation; not usable today):
-
-```bash
-# SERPdive — search-as-answer (Bearer sd_live_…)
-curl -X POST https://api.serpdive.com/v1/search -H "Authorization: Bearer $SERPDIVE_KEY" -H "Content-Type: application/json" -d '{"query":"...","model":"mako"}'
-# TinyFish — search (free, X-API-Key)
-curl "https://api.search.tinyfish.ai?query=..." -H "X-API-Key: $TINYFISH_API_KEY"
-# TinyFish — fetch full page (free, JS rendering)
-curl -X POST https://api.fetch.tinyfish.ai -H "X-API-Key: $TINYFISH_API_KEY" -H "Content-Type: application/json" -d '{"urls":["https://example.com"],"format":"markdown","ttl":0}'
-```
-
----
-
 ## Documentation
 
 | Doc | Purpose |
@@ -202,7 +170,6 @@ curl -X POST https://api.fetch.tinyfish.ai -H "X-API-Key: $TINYFISH_API_KEY" -H 
 - **License:** MIT — see [LICENSE](LICENSE).
 - Built on **OpenClaw** (plugin SDK, `agent exec`, session-spawn).
 - Desktop/vision via **[cua-driver](https://github.com/trycua/cua)** — `odsh.cua` spawns it locally, no focus steal; remote mode via **cua-computer-server**.
-- Web search via **[SERPdive](https://serpdive.com)** + **[TinyFish](https://tinyfish.ai)** — **planned, not yet implemented**.
 
 ---
 

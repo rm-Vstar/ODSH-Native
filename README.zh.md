@@ -26,7 +26,6 @@
 - [从 ClawHub 安装](#从-clawhub-安装)
 - [从源码安装（开发者）](#从源码安装开发者)
 - [Docker → 宿主桌面（远程 CUA）](#docker--宿主桌面远程-cua)
-- [网页搜索（SERPdive + TinyFish 智能选择）](#网页搜索serpdive--tinyfish-智能选择)
 - [文档](#文档)
 - [设计与安全](#设计与安全)
 - [路线图与版本](#路线图与版本)
@@ -128,30 +127,6 @@ openclaw mcp set cua-driver '{"url":"http://host.docker.internal:8000/mcp","tran
 
 ---
 
-## 网页搜索（SERPdive + TinyFish 智能选择）—— *规划，尚未实现*
-
-> **状态：PLANNED。** 该能力目前**没有实现**——`src/` 中无对应接线（`.env.example` 里的 `SERPDIVE_API_KEY` / `TINYFISH_API_KEY` 仅**预留**，供后续实现落地时免改 `.env`）。下面属于**预期设计**，今日均不可用。
-
-| 引擎 | 强项 | 何时选择 |
-|---|---|---|
-| **SERPdive**（serpdive.com） | 搜索即答案：一次调用返回提炼好的、可直接给 LLM 用的答案（answer + 每源 content） | 问答/调研式查询：要答案，不只是链接 |
-| **TinyFish**（tinyfish.ai） | 排序搜索 + **JS 渲染的整页抓取**（markdown 正文） | 需要原始正文、SPA/JS 重页面，或要整页文本 |
-
-**规划中的选择逻辑**：轻量路由——答案式查询先用 SERPdive；需要原始结果时退回 TinyFish Search；调用方要整页正文（urls[]）时用 TinyFish Fetch。两者低量免费（SERPdive：1000 credits/月含免费 krill 模型；TinyFish：Search 与 Fetch 在 $0 下也免费）。无需 DeepSeek 网页搜索余额。
-
-**预留接线**（供未来实现；今天不可用）：
-
-```bash
-# SERPdive — 搜索即答案（Bearer sd_live_…）
-curl -X POST https://api.serpdive.com/v1/search -H "Authorization: Bearer $SERPDIVE_KEY" -H "Content-Type: application/json" -d '{"query":"...","model":"mako"}'
-# TinyFish — 搜索（免费，X-API-Key）
-curl "https://api.search.tinyfish.ai?query=..." -H "X-API-Key: $TINYFISH_API_KEY"
-# TinyFish — 抓整页（免费，JS 渲染）
-curl -X POST https://api.fetch.tinyfish.ai -H "X-API-Key: $TINYFISH_API_KEY" -H "Content-Type: application/json" -d '{"urls":["https://example.com"],"format":"markdown","ttl":0}'
-```
-
----
-
 ## 文档
 
 | 文档 | 用途 |
@@ -186,7 +161,6 @@ curl -X POST https://api.fetch.tinyfish.ai -H "X-API-Key: $TINYFISH_API_KEY" -H 
 - **许可：** MIT — 见 [LICENSE](LICENSE)。
 - 基于 **OpenClaw**（插件 SDK、agent exec、会话派生）。
 - 桌面/视觉基于 **cua-driver**——本地 spawn，不抢焦点；远程模式经 **cua-computer-server**。
-- 网页搜索基于 **SERPdive** + **TinyFish**（**规划中，尚未实现**）。
 
 ---
 

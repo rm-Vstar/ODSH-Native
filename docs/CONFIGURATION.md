@@ -19,8 +19,6 @@ read from the environment — no plugin-config keys are wired yet.
 | `DSH_WORKER_TOKEN` | Bearer token sent to the remote worker (recommended when remote) | _(empty)_ |
 | `CUA_DRIVER` | cua-driver binary | `cua-driver` |
 | `CUA_REMOTE` | Remote cua-computer-server URL (docker → host desktop); empty = local cua-driver | _(empty)_ |
-| `SERPDIVE_API_KEY` | **Reserved** — web search is planned, not yet implemented | _(empty)_ |
-| `TINYFISH_API_KEY` | **Reserved** — web search is planned, not yet implemented | _(empty)_ |
 
 Notes:
 

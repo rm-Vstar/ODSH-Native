@@ -18,8 +18,6 @@ ODSH-Native 通过 `.env`（见 .env.example）配置。插件清单（openclaw.
 | DSH_WORKER_TOKEN | 发给远端 worker 的 Bearer token（remote 时建议设置） | 空 |
 | CUA_DRIVER | cua-driver 二进制 | cua-driver |
 | CUA_REMOTE | 远程 cua-computer-server URL（docker → 宿主桌面）；空=本地 cua-driver | 空 |
-| SERPDIVE_API_KEY | **保留**——网页搜索规划中，尚未实现 | 空 |
-| TINYFISH_API_KEY | **保留**——网页搜索规划中，尚未实现 | 空 |
 
 说明：
 

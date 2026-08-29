@@ -4,6 +4,20 @@ All notable changes to ODSH-Native are documented here. Format: Keep a Changelog
 
 ## [Unreleased]
 
+**Cleanup 2026-08-29: remove the planned-but-never-implemented web-search feature** (SERPdive +
+TinyFish is a separate DSH-side project, out of scope for ODSH-Native).
+
+### Removed
+
+- `README.md` / `README.zh.md`: dropped the "Web search (SERPdive + TinyFish, smart selection)"
+section, its TOC entry and the License/credits line — the feature was documented as "planned
+not implemented" and ships no code; it belongs to another project.
+- `.env.example`: removed the reserved `SERPDIVE_API_KEY` / `TINYFISH_API_KEY` block.
+- `docs/CONFIGURATION(.zh).md`: removed the two reserved web-search key rows.
+- `ROADMAP.md`: removed the planned web-search item.
+- `CHANGELOG.md` history: entries that described the planned web-search feature were updated
+  to reflect its removal (the feature never shipped).
+
 **CUA 打通 validation round (2026-08-29, from the Docker→host CUA integration summary)**.
 
 ### Added
@@ -105,9 +119,7 @@ All notable changes to ODSH-Native are documented here. Format: Keep a Changelog
 - `package.json`: removed the dangling `typebox` dependency (zero src references) and
   corrected `engines` to `>=22.6` (required for `--experimental-strip-types`).
 - `scripts/check.mjs` now also syntax-checks `.ts` files (matches docs/OPERATIONS claim).
-- README(EN/zh): web search (SERPdive + TinyFish) is now explicitly **planned, not
-  implemented**; B-class watcher/scheduler described as a library API that is not
-  auto-started; Node badge -> >=22.6. ROADMAP.md ClawHub items marked done.
+- README(EN/zh): B-class watcher/scheduler is a library API, not auto-started; Node badge -> >=22.6; ROADMAP ClawHub items marked done.
 
 ## [2.0.5] - 2026-08-28
 
@@ -117,16 +129,11 @@ All notable changes to ODSH-Native are documented here. Format: Keep a Changelog
 
 - Top-level English/Chinese language switch (mirrors the ODSH-Bridge for Docker README) plus badges, TOC, and richer sections.
 - New Docker → host desktop (remote CUA) section: host prerequisites (cua-driver + cua-computer-server), container-side options (CUA_REMOTE env or OpenClaw mcp set cua-driver streamable-http), security note (no built-in token).
-- New Web search (SERPdive + TinyFish, smart selection) **documentation only** — the plugin
-  ships **no implementation yet** (status: planned; keys reserved in `.env.example`).
-- .env.example: CUA_REMOTE, SERPDIVE_API_KEY, TINYFISH_API_KEY.
 
 ### Changed
 
 - README.md / README.zh.md restructured to match the ODSH-Bridge format.
 
-## [2.0.4] - 2026-08-28
-All notable changes to ODSH-Native are documented here. Format: Keep a Changelog.
 
 ## [2.0.4] - 2026-08-28
 

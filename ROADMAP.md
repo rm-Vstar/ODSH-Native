@@ -16,8 +16,6 @@
 - [ ] `odsh.serve` remote mode against a real DSH/Cordis worker (DSH_WORKER_ENDPOINT E2E).
 - [ ] Wire the resident watcher/scheduler helpers (`startResidentServices`) into the plugin
       lifecycle so B-class services actually start on install (currently library-only).
-- [ ] Web search (SERPdive + TinyFish smart routing) — **planned; no implementation ships yet**
-      (`SERPDIVE_API_KEY` / `TINYFISH_API_KEY` are reserved in `.env.example` only).
 
 ## Phase 2 - Ecosystem
 
