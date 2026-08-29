@@ -42,7 +42,7 @@
 - （复用 DSH 侧 `odsh-bridge.ts` 那种 `ctx.effect(spawn)` 的能力）
 
 ### 3.6 配置
-`configSchema`（`openclaw.plugin.json`）+ `config` 校验（对 `typebox`）。
+`configSchema`（`openclaw.plugin.json`，当前为空对象：无已接线的插件配置键，所有运行时开关走环境变量；无需额外校验依赖）。
 
 ## 4. 目录结构（重构后目标）
 
@@ -98,7 +98,7 @@ ODSH-Native/
 - [x] src/runtime/{exec,cua,visual,dsh-worker}.mjs: A 类执行工具 + B 类 DSH worker 桥 (internal/remote)
 - [x] src/services/{watcher,scheduler}.mjs: B 类常驻后台服务
 - [x] scripts/build.mjs -> dist/index.js (runtimeExtensions 产物, 可 import)
-- [x] 测试: 11 cases 全 PASS (registry3+runtime2+services2+dsh-worker2+plugin-load2); check ALL_SYNTAX_OK(23+)
+- [x] 测试: 19 cases 全 PASS (cua4 + registry4 + plugin-load3 + runtime3 + services2 + dsh-worker2 + security1); check ALL_SYNTAX_OK(mjs/js/ts 全覆盖, 含 src/index.ts)
 - [ ] 真连 DSH 后端 (DSH_WORKER_ENDPOINT) 端到端 (internal 已验证)
 - [x] 真 OpenClaw plugin-sdk 加载验证: 用 npm openclaw@2026.7.1-2 的 plugin-sdk/tool-plugin 加载 plugin, 注册 4 tools 并真实执行 odsh.exec(round-trip ok) -- 本环境已实证
 

@@ -77,6 +77,19 @@ async function remoteScreenshot() {
   }
 }
 
+// Pick the newest capture under CAP_DIR, verifying each candidate still exists (the
+// directory may be shared/rotated by other captures, so a name listed by readdir can
+// already be gone or half-written — fall back to older files instead of returning a
+// stale or non-existent path).
+async function pickLatestImage() {
+  const names = (await readdir(CAP_DIR)).filter((n) => /\.(png|jpe?g|webp)$/i.test(n)).sort();
+  for (let i = names.length - 1; i >= 0; i--) {
+    const cand = join(CAP_DIR, names[i]);
+    try { if ((await stat(cand)).isFile()) return cand; } catch { /* removed/replaced concurrently — try older */ }
+  }
+  return null;
+}
+
 async function localCaptureScreen(cuaPath) {
   await mkdir(CAP_DIR, { recursive: true });
   const out = join(CAP_DIR, 'desktop-' + process.pid + '-' + Date.now() + '.png');
@@ -84,10 +97,7 @@ async function localCaptureScreen(cuaPath) {
     await run(cuaPath, ['get_desktop_state'], { timeout: 60000, maxBuffer: 64 * 1024 * 1024 });
     let found = null;
     try { if ((await stat(out)).isFile()) found = out; } catch { /* not there */ }
-    if (!found) {
-      const names = (await readdir(CAP_DIR)).filter((n) => /\.(png|jpe?g|webp)$/i.test(n));
-      if (names.length) found = join(CAP_DIR, names[names.length - 1]);
-    }
+    if (!found) found = await pickLatestImage();
     if (!found) return { ok: false, error: 'cua-driver ran but produced no image file' };
     return { ok: true, path: found };
   } catch (e) {

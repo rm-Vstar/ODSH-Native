@@ -6,7 +6,7 @@
 [**中文**](https://github.com/rm-Vstar/ODSH-Native/blob/main/README.zh.md)
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Node](https://img.shields.io/badge/Node-%3E%3D18-green.svg)
+![Node](https://img.shields.io/badge/Node-%3E%3D22.6-green.svg)
 ![OpenClaw](https://img.shields.io/badge/OpenClaw-plugin-blue.svg)
 ![ClawHub](https://img.shields.io/badge/ClawHub-odsh--native-8a2be2.svg)
 
@@ -14,8 +14,8 @@
 
 > **One-line positioning**: turns your OpenClaw agent into a **DeepSeek Harness (DSH) execution
 > plane** — real local commands (odsh.exec), desktop control & screenshots (odsh.cua /
-> odsh.visual), DSH-worker dispatch (odsh.serve), DSH-style tool plugins, and resident
-> watcher/scheduler services — as a **native OpenClaw plugin** (official SDK contract).
+> odsh.visual), DSH-worker dispatch (odsh.serve), DSH-style tool plugins — as a **native
+> OpenClaw plugin** (official SDK contract).
 > No second LLM, no Windows-Node + SSH bridge, no Docker requirement — just `openclaw plugins install clawhub:odsh-native`.
 
 > Published on **ClawHub**: `odsh-native` (community, source-linked, pluginApi ≥ 2026.3.24-beta).
@@ -42,11 +42,12 @@
 - **Control the desktop** with `odsh.cua` — click, type, browse via cua-driver, no focus steal.
 - **Understand screens / images** with `odsh.visual` — local OCR via tesseract, or a live frame from local cua-driver / remote computer-server.
 - **Dispatch work to a DSH / Cordis worker** with `odsh.serve` (local subprocess or remote HTTP).
-- **Add DSH-style tool plugins** and run **resident watcher / scheduler** services.
+- **Add DSH-style tool plugins** (auto-discovered from `plugins/` via the fail-closed registry).
+- B-class watcher/scheduler helpers exist as a library API (`startResidentServices`) but are **not auto-started** by the plugin yet — see the Roadmap.
 
-ODSH-Native rebundles the [ODSH-Bridge](https://github.com/Mikoribbit/odsh-bridge) idea as an
-open-source OpenClaw plugin: DeepSeek Harness execution + plugin/capability surface as first-class
-agent tool plane — **no second LLM, no Windows-Node + SSH bridge, no Docker requirement.**
+ODSH-Native rebundles the idea of the upstream [ODSH-Bridge](https://github.com/Mikoribbit/odsh-bridge)
+project as an open-source OpenClaw plugin: DeepSeek Harness execution + plugin/capability surface as
+first-class agent tool plane — **no second LLM, no Windows-Node + SSH bridge, no Docker requirement.**
 
 ---
 
@@ -63,7 +64,7 @@ Then open **`/tools`** in the OpenClaw UI and confirm `odsh.exec`, `odsh.cua`, `
 > **Why the risk flag?** Release-scan marks `suspicious` because this is a high-privilege
 > **local exec + desktop-control** plugin by design — it lands `odsh.exec` (shell-free),
 > a desktop capture path, and an optional remote worker call. The plugin stays
-> fail-closed (no shell, tool whitelist, path containment); acknowledge the trust flag
+> fail-closed (no shell, tool-name format checks, path containment); acknowledge the trust flag
 > only after a quick source review.
 
 ---
@@ -124,21 +125,25 @@ openclaw mcp set cua-driver '{"url":"http://host.docker.internal:8000/mcp","tran
 
 ---
 
-## Web search (SERPdive + TinyFish, smart selection)
+## Web search (SERPdive + TinyFish, smart selection) — *planned, not implemented*
 
-**ODSH-Native pairs two free web engines and picks per request:**
+> **Status: PLANNED.** This release ships **no web-search implementation** — there is no
+> wire-up in `src/` (the `SERPDIVE_API_KEY` / `TINYFISH_API_KEY` entries in `.env.example`
+> are **reserved** so installing the plugin needs no `.env` churn later). The design below
+> documents the intended engine selection; nothing here is operational yet.
 
 | Engine | Strengths | When selected |
 |---|---|---|
 | **SERPdive** (serpdive.com) | "search-as-answer": one call returns distilled, LLM-ready answers (`answer` + per-source `content`) | Q&A / research-style queries that need an answer, not just links |
 | **TinyFish** (tinyfish.ai) | ranked search + **JS-rendered fetch** of full page bodies (markdown) | Raw content, SPA/JS-heavy pages, or when you need full page text |
 
-**How it selects:** a thin router tries SERPdive first for answer-style queries; falls back to
-TinyFish Search when a query needs raw results, and TinyFish Fetch when the caller wants full page
-bodies (`urls[]`). Both are free at low volume (SERPdive: 1000 credits/mo incl. the free `krill`
-model; TinyFish: Search & Fetch free even at $0). No DeepSeek web-search balance is required.
+**Planned selection rule:** a thin router tries SERPdive first for answer-style queries; falls
+back to TinyFish Search when a query needs raw results, and TinyFish Fetch when the caller wants
+full page bodies (`urls[]`). Both are free at low volume (SERPdive: 1000 credits/mo incl. the
+free `krill` model; TinyFish: Search & Fetch free even at $0). No DeepSeek web-search balance is
+required.
 
-**Wire it up** (each is a one-liner):
+**Reserved wiring** (for a future implementation; not usable today):
 
 ```bash
 # SERPdive — search-as-answer (Bearer sd_live_…)
@@ -169,7 +174,7 @@ curl -X POST https://api.fetch.tinyfish.ai -H "X-API-Key: $TINYFISH_API_KEY" -H 
 - **Native plugin, not a bridge runtime.** Official `openclaw/plugin-sdk/tool-plugin` `defineToolPlugin` contract — no self-built registry-as-runtime.
 - **`openclaw` is a peer dependency** — provided by the host OpenClaw, never bundled.
 - **TypeScript/ESM entry** (`src/index.ts`) + plain-ESM runtime (`src/runtime/*.mjs`) — runs with no TS build chain.
-- **Fail-closed by default:** shell-free `execFile`, tool-name whitelist, http(s)-only `CUA_REMOTE`, path-containment in the registry, optional remote-worker Bearer auth, no real tokens committed, and `tests/security.test.mjs` blocks tracked personal identifiers & secrets. See docs/OPERATIONS §Security.
+- **Fail-closed by default:** shell-free `execFile`, tool-name format checks, http(s)-only `CUA_REMOTE`, path-containment + symlink-escape rejection in the registry, optional remote-worker Bearer auth, no real tokens committed, and `tests/security.test.mjs` blocks tracked personal identifiers & secrets. See docs/OPERATIONS §Security.
 
 ---
 
@@ -185,7 +190,7 @@ curl -X POST https://api.fetch.tinyfish.ai -H "X-API-Key: $TINYFISH_API_KEY" -H 
 - **License:** MIT — see [LICENSE](LICENSE).
 - Built on **OpenClaw** (plugin SDK, `agent exec`, session-spawn).
 - Desktop/vision via **[cua-driver](https://github.com/trycua/cua)** — `odsh.cua` spawns it locally, no focus steal; remote mode via **cua-computer-server**.
-- Web search via **[SERPdive](https://serpdive.com)** + **[TinyFish](https://tinyfish.ai)**.
+- Web search via **[SERPdive](https://serpdive.com)** + **[TinyFish](https://tinyfish.ai)** — **planned, not yet implemented**.
 
 ---
 

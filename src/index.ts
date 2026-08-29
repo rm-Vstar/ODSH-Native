@@ -19,7 +19,10 @@ export default defineToolPlugin({
       { name: "odsh.exec", description: "Execute a local command (fail-closed argv).", parameters: { type: "object", properties: { cmd: { type: "string" }, args: { type: "array", items: { type: "string" } }, cwd: { type: "string" } }, required: ["cmd"] }, execute: async (params) => execTool(params || {}) },
       { name: "odsh.cua", description: "Drive local CUA (cua-driver): image/click/browser, no focus steal.", parameters: { type: "object", properties: { tool: { type: "string" }, args: { type: "object" } }, required: ["tool"] }, execute: async (params) => runCua(params || {}) },
       { name: "odsh.visual", description: "Describe a screenshot/image (OCR/vision).", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] }, execute: async (params) => describeVisual(params || {}) },
-      { name: "odsh.serve", description: "Execute a task inside a DSH Harness resident worker (B-class).", parameters: { type: "object", properties: { task: { type: "string" } }, required: ["task"] }, execute: async (params) => spawnDSHWorker(params || {}) },
+      // odsh.serve mirrors the worker contract (src/runtime/dsh-worker.mjs): internal mode
+      // needs a command + args; remote mode (DSH_WORKER_ENDPOINT set) dispatches the task
+      // object to the remote worker. Secrets (endpoints/tokens) stay OUT of the schema.
+      { name: "odsh.serve", description: "Execute a task inside a DSH Harness resident worker (B-class): internal mode runs a local command, remote mode POSTs to DSH_WORKER_ENDPOINT.", parameters: { type: "object", properties: { task: { type: "string" }, cmd: { type: "string" }, args: { type: "array", items: { type: "string" } }, mode: { type: "string", enum: ["internal", "remote"] }, timeoutMs: { type: "integer", minimum: 1 } }, required: ["task"] }, execute: async (params) => spawnDSHWorker(params || {}) },
     ];
   },
 });

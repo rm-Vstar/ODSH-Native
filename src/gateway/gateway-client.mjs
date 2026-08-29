@@ -27,7 +27,11 @@ export const SUB_PROTOCOL = 'json';                 // Sec-WebSocket-Protocol
 export const CONNECT_METHOD = 'connect';
 // Role and scopes granted after successful pairing (the operator permissions approved in the OpenClaw Control UI)
 export const ROLE = 'operator';
-export const SCOPES = ['operator.admin', 'operator.read', 'operator.write', 'operator.approvals', 'operator.pairing'];
+// Least-privilege: this client only ever calls tools (bridge.mjs -> tools.invoke) and reads
+// status, so it requests the minimal work scopes — NOT admin/approvals/pairing management.
+// (If a future gateway requires the exact approved scope set, restore the full list:
+// ['operator.admin', 'operator.read', 'operator.write', 'operator.approvals', 'operator.pairing'].)
+export const SCOPES = ['operator.read', 'operator.write'];
 // Client identity description (this shape emulated the Control UI in the verify environment)
 export const CLIENT = {
   id: 'openclaw-control-ui',
@@ -94,6 +98,11 @@ function wsSendFrame(sock, opcode, payloadBuf) {
 /** Send a text message frame (opcode 0x1, FIN=1) */
 function wsSendText(sock, text) {
   wsSendFrame(sock, 0x1, Buffer.from(text, 'utf8'));
+}
+
+/** Send a ping (opcode 0x9, FIN=1) — used by the keepalive timer. Exported for tests. */
+export function wsSendPing(sock) {
+  wsSendFrame(sock, 0x9, Buffer.alloc(0));
 }
 
 /** Send a pong (opcode 0xA) to answer the peer's ping — a robustness enhancement, ⚠️ whether the gateway sends ping was not confirmed in the verify environment */
@@ -348,7 +357,11 @@ export async function openSession(o = {}) {
     while (!closed) {
       let f;
       try { f = await readFrame(sock); } catch { break; }
-      if (!f) break;
+      // readFrame returns null on a read timeout (idle link with no gateway traffic) —
+      // that is NOT a close. Only a closed socket or a close frame ends the loop;
+      // otherwise an idle connection would self-destruct after ~8s (readN default
+      // timeout) and trigger a reconnect storm.
+      if (!f) { if (sock.readyState === 'closed') break; continue; }
       if (f.op === 8) break;                 // close
       if (f.op === 9) { wsPong(sock, f.payload); continue; }
       if (f.op === 10) continue;
@@ -366,11 +379,25 @@ export async function openSession(o = {}) {
       // 中文：其余 event/notification 帧当前无订阅者，忽略；可在此扩展事件订阅。
     }
     closed = true;
+    if (keepaliveTimer) clearInterval(keepaliveTimer);
     for (const p of pending.values()) { clearTimeout(p.timer); p.reject(new Error('connection closed')); }
     pending.clear();
     try { safeClose(sock); } catch { /* ignore */ }
     for (const cb of onCloseCallbacks) { try { cb(); } catch { /* ignore */ } }
   })();
+
+  // Keepalive: some gateways never send unsolicited frames, so an otherwise idle
+  // connection would sit silent. Send a masked WS ping on a configurable interval
+  // (ODSH_WS_KEEPALIVE_MS, default 4000; 0 disables) to keep the link warm and the
+  // peer's pong answers also exercise the recv loop. Never keeps the process alive.
+  const keepaliveMs = Number(process.env.ODSH_WS_KEEPALIVE_MS ?? '4000');
+  let keepaliveTimer = null;
+  if (keepaliveMs > 0) {
+    keepaliveTimer = setInterval(() => {
+      if (!closed && sock.readyState === 'open') { try { wsSendPing(sock); } catch { /* ignore */ } }
+    }, keepaliveMs);
+    if (typeof keepaliveTimer.unref === 'function') keepaliveTimer.unref();
+  }
 
   return {
     deviceId: identity.deviceId,
@@ -404,6 +431,7 @@ export async function openSession(o = {}) {
 
     close() {
       if (closed) return;
+      if (keepaliveTimer) clearInterval(keepaliveTimer);
       try { sock.write(Buffer.from([0x88, 0x00])); } catch { /* ignore */ }
       try { safeClose(sock); } catch { /* ignore */ }
     },

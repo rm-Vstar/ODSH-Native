@@ -2,7 +2,7 @@
 Get ODSH-Native running as an OpenClaw plugin.
 
 ## 1. Requirements
-- Node 18+ (24+ recommended for `--experimental-strip-types`).
+- Node 22.6+ (24/25 recommended; `--experimental-strip-types` requires ≥ 22.6).
 - An OpenClaw host (provides the `openclaw` peer package).
 - (optional) `cua-driver` for the `odsh.cua` tool.
 

@@ -5,7 +5,10 @@ export function createWatcher({ paths = [], handler = async () => {} } = {}) {
   for (const p of paths) {
     try {
       const w = watch(p, { persistent: true }, (evt, filename) => {
-        Promise.resolve(handler({ eventType: evt, filename, path: p })).catch(() => {});
+        // A handler that throws synchronously must not take down the host process:
+        // isolate the call, log the failure, keep watching.
+        try { Promise.resolve(handler({ eventType: evt, filename, path: p })).catch((e) => console.warn('[watcher] handler error:', e?.message || e)); }
+        catch (e) { console.warn('[watcher] handler threw synchronously:', e?.message || e); }
       });
       watchers.push(w);
     } catch (e) { /* unwatchable */ }

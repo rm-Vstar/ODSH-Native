@@ -1,5 +1,6 @@
 // registry.mjs — ODSH-Native 能力/插件注册表（fail-closed，安全发现）
 import { readdir, readFile } from 'node:fs/promises';
+import { realpathSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -37,6 +38,16 @@ export class Registry {
         const root = resolve(this.pluginsDir);
         if (implPath !== root && !implPath.startsWith(root + sep)) {
           console.warn('[registry] skip tool outside pluginsDir:', name + '/' + t.name, t.impl);
+          continue;
+        }
+        // Symlink escape: a symlink inside pluginsDir may point at a file outside it,
+        // bypassing the lexical containment check above. Resolve the real path and
+        // re-check containment against the real pluginsDir root before importing.
+        let realImpl, realRoot;
+        try { realImpl = realpathSync(implPath); realRoot = realpathSync(root); }
+        catch { console.warn('[registry] skip unreadable impl:', name + '/' + t.name, t.impl); continue; }
+        if (realImpl !== realRoot && !realImpl.startsWith(realRoot + sep)) {
+          console.warn('[registry] skip tool whose real path escapes pluginsDir (symlink?):', name + '/' + t.name, t.impl);
           continue;
         }
         const mod = await import(pathToFileURL(implPath).href);

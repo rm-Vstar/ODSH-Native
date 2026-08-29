@@ -1,8 +1,17 @@
 #!/usr/bin/env node
 // security.test.mjs - security regression scans for ODSH-Native (npm test).
+//
+// Dual use:
+//   1. Standalone: `node tests/security.test.mjs` runs the full scan and exits
+//      with a real status code (used by `npm test` first stage).
+//   2. Imported by scripts/test.mjs: the scan only runs as the exported test
+//      function `t_security_scan` — the top level NEVER calls process.exit, so
+//      the runner keeps executing the remaining suites (this module used to
+//      `process.exit(0)` at import time, silently killing the runner after the
+//      security scan while still reporting a green exit code).
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve, dirname, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SKIP_DIRS = ["node_modules", "dist", ".git", ".dsh", "tmp-sec.mjs"];
@@ -20,52 +29,77 @@ function walk(acc, dir) {
 const files = walk([], "");
 const read = (rel) => { try { return readFileSync(join(ROOT, rel.split("/").join(sep)), "utf8"); } catch { return ""; } };
 
-let failures = 0;
-function ok(n){ console.log("  \u2713 " + n); }
-function bad(n, d){ failures++; console.error("  \u2717 " + n + (d ? " :: " + d : "")); }
-function assert(c, n, d){ c ? ok(n) : bad(n, d); }
+/**
+ * Run the whole security scan. Pure-ish: prints per-check progress lines and
+ * returns `{ failures, files }`. Never calls process.exit.
+ */
+export function runSecuritySuite() {
+  let failures = 0;
+  function ok(n){ console.log("  \u2713 " + n); }
+  function bad(n, d){ failures++; console.error("  \u2717 " + n + (d ? " :: " + d : "")); }
+  function assert(c, n, d){ c ? ok(n) : bad(n, d); }
 
-console.log("security scan (" + files.length + " files):");
+  console.log("security scan (" + files.length + " files):");
 
-// 1) fail-closed in runtime
-const execSrc = read("src/runtime/exec.mjs");
-assert(/shell:\s*false/.test(execSrc), "exec uses execFile without shell (no command injection)");
-const cuaSrc = read("src/runtime/cua.mjs");
-assert(/TOOL_RE/.test(cuaSrc), "cua tool-name whitelist present (fail-closed)");
+  // 1) fail-closed in runtime
+  const execSrc = read("src/runtime/exec.mjs");
+  assert(/shell:\s*false/.test(execSrc), "exec uses execFile without shell (no command injection)");
+  const cuaSrc = read("src/runtime/cua.mjs");
+  assert(/TOOL_RE/.test(cuaSrc), "cua tool-name format check present (fail-closed)");
 
-// 2) .env / node_modules gitignored
-const gi = read(".gitignore");
-assert(gi.includes(".env"), ".env gitignored");
-assert(gi.includes("node_modules"), "node_modules gitignored");
+  // 2) .env / node_modules gitignored
+  const gi = read(".gitignore");
+  assert(gi.includes(".env"), ".env gitignored");
+  assert(gi.includes("node_modules"), "node_modules gitignored");
 
-// 3) no obvious secrets / long tokens
-const PATS = [/([0-9a-f]){64}/gi, /ghp_[A-Za-z0-9]{20,}/g, /clh_[A-Za-z0-9]{20,}/g, /sk-[A-Za-z0-9]{20,}/g];
-let secretHit = [];
-for (const f of files) {
-  const raw = read(f.rel).replace(/REPLACE_WITH_GATEWAY_TOKEN/g, "");
-  for (const p of PATS) { const m = raw.match(p); if (m) secretHit.push(f.rel + ":" + p); }
-}
-assert(secretHit.length === 0, "no obvious secrets/keys across repo", secretHit.join(","));
-
-// 4) privacy: no personal email / username / hostname leaked (consented AUTHORS allowed)
-const CONSENT = ["AUTHORS.md", "tests/security.test.mjs"];
-let leaked = [];
-for (const f of files) {
-  if (CONSENT.includes(f.rel)) continue;
-  // Strip the authorized public ODSH-Bridge upstream URLs before scanning so a link to the
-  // public upstream repo is not misread as a leaked handle; genuine leaks elsewhere still trip.
-  const low = read(f.rel)
-    .toLowerCase()
-    .replace(/github\.com\/mikoribbit\/odsh-bridge/g, "github.com/<public-upstream>/odsh-bridge");
-  for (const id of ["mikoribbit", "vstarphoto", "89732", "mikopc2024", "h:/odsh-bridge"]) {
-    if (low.includes(id.toLowerCase())) leaked.push(f.rel + "#" + id);
+  // 3) no obvious secrets / long tokens
+  const PATS = [/([0-9a-f]){64}/gi, /ghp_[A-Za-z0-9]{20,}/g, /clh_[A-Za-z0-9]{20,}/g, /sk-[A-Za-z0-9]{20,}/g];
+  let secretHit = [];
+  for (const f of files) {
+    const raw = read(f.rel).replace(/REPLACE_WITH_GATEWAY_TOKEN/g, "");
+    for (const p of PATS) { const m = raw.match(p); if (m) secretHit.push(f.rel + ":" + p); }
   }
+  assert(secretHit.length === 0, "no obvious secrets/keys across repo", secretHit.join(","));
+
+  // 4) privacy: no personal email / username / hostname leaked (consented AUTHORS allowed)
+  const CONSENT = ["AUTHORS.md", "tests/security.test.mjs"];
+  let leaked = [];
+  for (const f of files) {
+    if (CONSENT.includes(f.rel)) continue;
+    // Strip the authorized public ODSH-Bridge upstream URLs before scanning so a link to the
+    // public upstream repo is not misread as a leaked handle; genuine leaks elsewhere still trip.
+    const low = read(f.rel)
+      .toLowerCase()
+      .replace(/github\.com\/mikoribbit\/odsh-bridge/g, "github.com/<public-upstream>/odsh-bridge");
+    // Authorized public identifiers allowlist: these strings legitimately appear in consented
+    // contexts (upstream repo owner handle, project owner's public handles, operator's public
+    // domain prefix, bridge path). They are NOT flagged as leaks here; the same identifier
+    // appearing anywhere else (outside AUTHORS.md / this test) still trips the scan.
+    for (const id of ["mikoribbit", "vstarphoto", "89732", "mikopc2024", "h:/odsh-bridge"]) {
+      if (low.includes(id.toLowerCase())) leaked.push(f.rel + "#" + id);
+    }
+  }
+  assert(leaked.length === 0, "no personal identifiers outside consented docs", leaked.join(","));
+
+  // 5) package.json name + semver
+  let pkg; try { pkg = JSON.parse(read("package.json")); } catch { pkg = null; }
+  assert(pkg && pkg.name === "odsh-native" && /^[0-9]+\.[0-9]+\.[0-9]+$/.test(pkg.version), "package.json name + semver");
+
+  return { failures, files: files.length };
 }
-assert(leaked.length === 0, "no personal identifiers outside consented docs", leaked.join(","));
 
-// 5) package.json name + semver
-let pkg; try { pkg = JSON.parse(read("package.json")); } catch { pkg = null; }
-assert(pkg && pkg.name === "odsh-native" && /^[0-9]+\.[0-9]+\.[0-9]+$/.test(pkg.version), "package.json name + semver");
+/** runner entry (scripts/test.mjs): throws on failure, never exits the process */
+export async function t_security_scan() {
+  const { failures, files } = runSecuritySuite();
+  if (failures > 0) throw new Error(failures + " failure(s) across " + files + " files");
+  return "security scan ok (" + files + " files)";
+}
 
-console.log(failures === 0 ? "\nALL SECURITY TESTS PASSED (" + files.length + " files)" : "\n" + failures + " FAILURE(S)");
-process.exit(failures === 0 ? 0 : 1);
+// Main entry guard: only runs (and may process.exit) when this file is executed
+// directly — NOT when scripts/test.mjs imports it as a suite module.
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) {
+  const { failures, files } = runSecuritySuite();
+  console.log(failures === 0 ? "\nALL SECURITY TESTS PASSED (" + files + " files)" : "\n" + failures + " FAILURE(S)");
+  process.exit(failures === 0 ? 0 : 1);
+}

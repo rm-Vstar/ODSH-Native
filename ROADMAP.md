@@ -9,17 +9,21 @@
 - [ ] Full host OpenClaw install & verify via /tools.
 - [x] `odsh.visual` local OCR via tesseract + cua-driver capture (truthful no-render note when no backend).
 - [ ] `odsh.visual` multimodal description backend (external model) for when no local OCR exists.
-- [ ] ClawHub publish as an installable plugin package.
+- [x] ClawHub publish as an installable plugin package (`clawhub:odsh-native`, v2.0.2+).
 
 ## Phase 1 - DSH Harness hosting
 
 - [ ] `odsh.serve` remote mode against a real DSH/Cordis worker (DSH_WORKER_ENDPOINT E2E).
-- [ ] Bidirectional bridge conventions (currently plugin → DSH worker).
+- [ ] Wire the resident watcher/scheduler helpers (`startResidentServices`) into the plugin
+      lifecycle so B-class services actually start on install (currently library-only).
+- [ ] Web search (SERPdive + TinyFish smart routing) — **planned; no implementation ships yet**
+      (`SERPDIVE_API_KEY` / `TINYFISH_API_KEY` are reserved in `.env.example` only).
 
 ## Phase 2 - Ecosystem
 
-- [ ] Publish to ClawHub; `openclaw plugins install clawhub:odsh-native`.
-- [ ] Example DSH-style plugins in `plugins/`.
+- [x] Publish to ClawHub (`openclaw plugins install clawhub:odsh-native`) — done in v2.0.2.
+- [x] Example DSH-style plugins in `plugins/` (example-plugin).
+- [ ] More example plugins + community docs.
 
 ## Decision rules
 

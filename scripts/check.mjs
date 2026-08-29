@@ -1,5 +1,6 @@
 // scripts/check.mjs — 跨平台递归 ESM 语法检查
-// Windows cmd 不展开 glob，node --check src/*.mjs 在宿主上失效；此脚本递归收集 .mjs/.js 再逐个 --check。
+// Windows cmd 不展开 glob，node --check src/*.mjs 在宿主上失效；此脚本递归收集 .mjs/.js/.ts 再逐个 --check。
+// .ts 文件（src/index.ts，erasable TS）经 --experimental-strip-types 剥类型后 --check。
 import { spawnSync } from 'node:child_process';
 import { readdirSync, statSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
@@ -13,7 +14,7 @@ function walk(dir, acc = []) {
     const p = join(dir, name);
     const st = statSync(p);
     if (st.isDirectory()) walk(p, acc);
-    else if (p.endsWith('.mjs') || p.endsWith('.js')) acc.push(p);
+    else if (p.endsWith('.mjs') || p.endsWith('.js') || p.endsWith('.ts')) acc.push(p);
   }
   return acc;
 }
@@ -21,9 +22,11 @@ function walk(dir, acc = []) {
 const files = walk(ROOT);
 let bad = 0;
 for (const file of files) {
-  const r = spawnSync(process.execPath, ['--check', file], { encoding: 'utf8' });
+  const isTs = file.endsWith('.ts');
+  const args = isTs ? ['--experimental-strip-types', '--check', file] : ['--check', file];
+  const r = spawnSync(process.execPath, args, { encoding: 'utf8' });
   if (r.status === 0) { console.log('OK   ' + file.replace(ROOT + sep, '')); }
   else { bad++; console.log('FAIL ' + file + '\n' + (r.stderr || '')); }
 }
 if (bad) { console.error('CHECK_FAILED ' + bad + ' file(s)'); process.exit(1); }
-console.log('ALL_SYNTAX_OK (' + files.length + ' files)');
+console.log('ALL_SYNTAX_OK (' + files.length + ' files) — mjs/js/ts covered');

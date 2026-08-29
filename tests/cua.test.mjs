@@ -1,27 +1,36 @@
 // tests/cua.test.mjs - CUA remote/local mode selection + fail-closed.
 // CUA_REMOTE is read at module load, so each case spawns a fresh node process.
 import { spawnSync } from 'node:child_process';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, unlinkSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const PROBE_FILE = join(ROOT, 'tests', '_cua_probe.mjs');
-const MOD = "/root/ODSH-bridge/Released/ODSH-Native//src/runtime/cua.mjs";
+// Resolve the runtime module relative to this test file (was a hard-coded
+// absolute path with a double slash and the wrong repo name).
+const MOD = new URL('../src/runtime/cua.mjs', import.meta.url).href;
+// Probe scripts live in the OS temp dir (never inside the repo), one per pid so
+// parallel runners cannot clobber each other; cleaned up after every spawn.
+const PROBE_FILE = join(tmpdir(), '_odsh_cua_probe-' + process.pid + '.mjs');
 
 function probe(env, args) {
   const script =
-    'import { runCua } from ' + JSON.stringify('file://' + MOD) + ';\n' +
+    'import { runCua } from ' + JSON.stringify(MOD) + ';\n' +
     'const out = await runCua(JSON.parse(process.env.PROBE || "{}"));\n' +
     'console.log(JSON.stringify(out));';
   writeFileSync(PROBE_FILE, script, 'utf8');
-  const r = spawnSync(process.execPath, ['--experimental-strip-types', PROBE_FILE], {
-    env: { ...process.env, ...env, PROBE: JSON.stringify(args) },
-    encoding: 'utf8', timeout: 30000,
-  });
-  if (r.status !== 0) throw new Error('probe failed: ' + (r.stderr || r.stdout));
-  const lines = (r.stdout || '').trim().split(/\r?\n/).filter(Boolean);
-  return JSON.parse(lines[lines.length - 1]);
+  try {
+    const r = spawnSync(process.execPath, ['--experimental-strip-types', PROBE_FILE], {
+      env: { ...process.env, ...env, PROBE: JSON.stringify(args) },
+      encoding: 'utf8', timeout: 30000,
+    });
+    if (r.status !== 0) throw new Error('probe failed: ' + (r.stderr || r.stdout));
+    const lines = (r.stdout || '').trim().split(/\r?\n/).filter(Boolean);
+    return JSON.parse(lines[lines.length - 1]);
+  } finally {
+    try { unlinkSync(PROBE_FILE); } catch { /* tmp file already gone */ }
+  }
 }
 
 export async function t_remote_rejects_invalid_url() {

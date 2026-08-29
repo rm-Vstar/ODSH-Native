@@ -1,4 +1,4 @@
-// src/runtime/exec.mjs — A-class tool: local exec (fail-safe argv whitelist)
+// src/runtime/exec.mjs — A-class tool: local exec (fail-safe argv validation)
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 const run = promisify(execFile);

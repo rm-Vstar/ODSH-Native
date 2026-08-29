@@ -4,7 +4,12 @@ export function createScheduler(tasks = []) {
   for (const t of tasks) {
     if (!t || !t.run) continue;
     const ms = (typeof t.every === "number") ? t.every : (parseInt(t.every, 10) || 60000);
-    timers.push(setInterval(() => { Promise.resolve(t.run()).catch(() => {}); }, ms));
+    timers.push(setInterval(() => {
+      // A handler that throws synchronously must not take down the host process:
+      // isolate the call, log the failure, keep scheduling.
+      try { Promise.resolve(t.run()).catch((e) => console.warn('[scheduler] task error:', e?.message || e)); }
+      catch (e) { console.warn('[scheduler] task threw synchronously:', e?.message || e); }
+    }, ms));
   }
   return { stop() { for (const id of timers) clearInterval(id); } };
 }

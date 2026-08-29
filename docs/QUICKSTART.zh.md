@@ -2,7 +2,7 @@
 本地跑通 ODSH-Native 插件。
 
 ## 前置
-- Node 18+（24+ 支持 `--experimental-strip-types`）
+- Node 22.6+（24/25 推荐；`--experimental-strip-types` 需要 ≥ 22.6）
 - 一个 OpenClaw 宿主（提供 `openclaw` peer 包）
 - （可选）`cua-driver` 供 `odsh.cua`
 

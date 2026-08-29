@@ -2,6 +2,84 @@
 
 All notable changes to ODSH-Native are documented here. Format: Keep a Changelog.
 
+## [Unreleased]
+
+**Audit round 2026-08-29 (round 2): security hardening + robustness.**
+
+### Security
+
+- `src/runtime/dsh-worker.mjs`: remote endpoint is now validated fail-closed
+  (`validateWorkerEndpoint`) — only `http(s)://` URLs are accepted; a bare host or a
+  non-http scheme is refused before the Bearer token could be sent to an unexpected
+  transport. Plain `http://` remains allowed (documented contract for local DSH/Cordis
+  workers) with a docs warning that the token travels in cleartext over it.
+- `src/registry.mjs`: plugin `impl` containment now resolves symlinks (`realpathSync`)
+  and re-checks the real path against the real pluginsDir root, closing the symlink-
+  escape bypass where a link inside pluginsDir pointed at a file outside it.
+- `src/services/scheduler.mjs` / `src/services/watcher.mjs`: a handler that throws
+  synchronously is now isolated (try/catch + logged warning) instead of crashing the
+  host process.
+- `src/gateway/gateway-client.mjs`: an idle connection no longer self-destructs after
+  the ~8s read timeout — a timed-out read is not a close, so the recv loop keeps
+  running until the socket actually closes. Added a configurable keepalive ping
+  (`ODSH_WS_KEEPALIVE_MS`, default 4000, 0 disables) to keep quiet links warm.
+- Docs honesty: "tool whitelist" wording corrected to "tool-name format check" across
+  `runtime/cua.mjs`, `runtime/exec.mjs`, README, OPERATIONS, CUA-EXECUTION (EN/zh) —
+  the existing check is a fail-closed name-format regex, not a capability whitelist.
+- `docs/CONFIGURATION(.zh).md`: `DSH_WORKER_ENDPOINT` row now documents the http(s)
+  requirement and the cleartext-token caveat of plain http.
+
+### Tests
+
+- New `tests/dsh-worker.test.mjs`: endpoint scheme validation (http/https allowed,
+  bare host / empty / file: / ftp: rejected).
+- `tests/registry.test.mjs::t_blocks_symlink_escape`: symlink inside pluginsDir
+  pointing outside is blocked fail-closed.
+- `tests/services.test.mjs`: `t_scheduler_sync_throw_does_not_crash` and
+  `t_watcher_sync_throw_does_not_crash` — sync-throwing handlers must not kill the
+  host and healthy neighbours keep working.
+- New `tests/gateway-client.test.mjs`: keepalive ping frame is a masked, empty
+  RFC 6455 ping.
+
+**Audit round 2026-08-29: test-harness truth, doc honesty, least-privilege, wiring cleanup.**
+
+### Fixed
+
+- `tests/security.test.mjs` no longer calls `process.exit()` at import time. It previously
+  killed the `scripts/test.mjs` runner mid-suite (the security scan ran a second time and
+  exited 0 before `services.test.mjs` ever executed — a false-green npm test). The scan is
+  now exported as a pure function + a `t_security_scan` test; the top-level exit only runs
+  when the file is executed directly (`npm test` first stage).
+- `scripts/test.mjs` now enforces a minimum of **16 collected cases** across suites, so a
+  suite that silently exports nothing can no longer pass as green.
+- `tests/cua.test.mjs` resolved its hard-coded absolute module path (wrong repo name,
+  double slash) to `new URL('../src/runtime/cua.mjs', import.meta.url)`; the probe file now
+  lives in `os.tmpdir()` (per-pid) and is cleaned up after every probe instead of polluting
+  the repo.
+- `tests/registry.test.mjs::t_invoke_unknown_tool` was a stub (`let threw = false;` with no
+  assertion) — it now asserts the unknown-tool invocation actually rejects.
+- `src/runtime/visual.mjs`: latest-PNG fallback selection now verifies the chosen file
+  exists (stat) and walks back to older images, removing the race where a file listed by
+  `readdir` could be gone/replaced before return.
+
+### Changed
+
+- `odsh.serve` schema (`src/index.ts`) now mirrors the worker contract: `cmd`, `args`,
+  `mode`, `timeoutMs` added (internal mode requires `cmd`; secrets stay out of the schema).
+- Least-privilege: `gateway-client.mjs` requests `['operator.read','operator.write']`
+  instead of `admin/approvals/pairing` (the client only calls tools; if a future gateway
+  needs the exact approved set, restore the commented full list).
+- `openclaw.plugin.json` `configSchema` trimmed to an empty schema: the declared
+  `pluginsDir`/`watch`/`dshWorker` keys were never consumed by the runtime.
+- `.env.example` drops un-wired keys (`ODSH_PLUGINS_DIR`, `ODSH_WATCH_*`, `ODSH_SCHEDULE_JSON`,
+  `CUA_TIMEOUT_MS`); `docs/CONFIGURATION(.zh).md` env tables synced to it.
+- `package.json`: removed the dangling `typebox` dependency (zero src references) and
+  corrected `engines` to `>=22.6` (required for `--experimental-strip-types`).
+- `scripts/check.mjs` now also syntax-checks `.ts` files (matches docs/OPERATIONS claim).
+- README(EN/zh): web search (SERPdive + TinyFish) is now explicitly **planned, not
+  implemented**; B-class watcher/scheduler described as a library API that is not
+  auto-started; Node badge -> >=22.6. ROADMAP.md ClawHub items marked done.
+
 ## [2.0.5] - 2026-08-28
 
 **README rebuild (EN/zh top-level language switch, docker→host remote-CUA + web-search sections, env sample).**
@@ -10,7 +88,8 @@ All notable changes to ODSH-Native are documented here. Format: Keep a Changelog
 
 - Top-level English/Chinese language switch (mirrors the ODSH-Bridge for Docker README) plus badges, TOC, and richer sections.
 - New Docker → host desktop (remote CUA) section: host prerequisites (cua-driver + cua-computer-server), container-side options (CUA_REMOTE env or OpenClaw mcp set cua-driver streamable-http), security note (no built-in token).
-- New Web search (SERPdive + TinyFish, smart selection) section: engine table, selection rule (SERPdive for answers, TinyFish Search for raw results, TinyFish Fetch for full pages), one-line curl wiring, both free.
+- New Web search (SERPdive + TinyFish, smart selection) **documentation only** — the plugin
+  ships **no implementation yet** (status: planned; keys reserved in `.env.example`).
 - .env.example: CUA_REMOTE, SERPDIVE_API_KEY, TINYFISH_API_KEY.
 
 ### Changed

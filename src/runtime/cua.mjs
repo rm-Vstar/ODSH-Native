@@ -2,7 +2,7 @@
 // Two modes, selected by CUA_REMOTE (optional):
 //   * empty        -> LOCAL  : execFile('cua-driver', ...) on this host (host install).
 //   * http(s) URL  -> REMOTE : POST <url>/cmd to a cua-computer-server (docker -> host).
-// Fail-closed in both modes: tool-name whitelist, no shell, http(s)-only remote URL,
+// Fail-closed in both modes: tool-name format check, no shell, http(s)-only remote URL,
 // remote errors surface as {ok:false} instead of throwing.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -49,7 +49,7 @@ export async function runCua({ tool, args = {}, timeoutMs = 60000 } = {}) {
   if (!tool || !TOOL_RE.test(String(tool))) return { ok: false, error: 'invalid/empty cua tool' };
   if (REMOTE) return remoteCua(tool, args, timeoutMs);
 
-  // LOCAL mode: forward args as --key value (array form, no shell, keys whitelisted).
+  // LOCAL mode: forward args as --key value (array form, no shell, keys format-checked).
   const argv = [tool];
   if (args && typeof args === 'object') {
     for (const [k, v] of Object.entries(args)) {

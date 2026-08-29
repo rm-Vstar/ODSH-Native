@@ -8,7 +8,7 @@ the simplest wiring in both host and docker environments:
 | **Local** (default) | cua-driver installed on the same host as OpenClaw | `CUA_REMOTE` empty → spawn `cua-driver` locally (host install, no tunnel). |
 | **Remote** | OpenClaw in a container, desktop on the Windows/macOS host | `CUA_REMOTE=http://host.docker.internal:8000` → talk to a `cua-computer-server` over HTTP (`POST /cmd`). |
 
-Both are fail-closed: tool-name whitelist, no shell, http(s)-only remote URL, remote errors surface as `{ok:false}` instead of throwing.
+Both are fail-closed: tool-name format check, no shell, http(s)-only remote URL, remote errors surface as `{ok:false}` instead of throwing.
 
 ## Enable
 
@@ -40,6 +40,6 @@ Both are fail-closed: tool-name whitelist, no shell, http(s)-only remote URL, re
 
 ## Security
 
-- Tool-name whitelist (fail-closed) in `runtime/cua.mjs`; remote URL must be http(s); argv keys whitelisted.
+- Tool-name format check (fail-closed) in `runtime/cua.mjs`; remote URL must be http(s); argv keys format-checked.
 - Remote mode has **no built-in token in computer-server** — bind it locally or firewall to your docker subnet, or wrap in SSH.
 - Config comes from the operator, not from untrusted envelopes.

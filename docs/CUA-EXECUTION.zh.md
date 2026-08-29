@@ -7,7 +7,7 @@ ODSH-Native 通过 **cua-driver**（trycua/cua）驱动桌面/视觉。两种可
 | **本地**（默认） | cua-driver 与 OpenClaw 同机 | `CUA_REMOTE` 留空 → 本地 spawn `cua-driver`（宿主安装，无隧道） |
 | **远程** | OpenClaw 在容器里、桌面在 Windows/macOS 宿主 | `CUA_REMOTE=http://host.docker.internal:8000` → 经 HTTP 调用宿主上的 `cua-computer-server`（`POST /cmd`） |
 
-两种模式均 fail-closed：工具名白名单、无 shell、远程 URL 仅 http(s)、远程错误以 `{ok:false}` 返回而不抛异常。
+两种模式均 fail-closed：工具名格式校验、无 shell、远程 URL 仅 http(s)、远程错误以 `{ok:false}` 返回而不抛异常。
 
 ## 启用
 
@@ -39,6 +39,6 @@ ODSH-Native 通过 **cua-driver**（trycua/cua）驱动桌面/视觉。两种可
 
 ## 安全
 
-- `runtime/cua.mjs` 工具名白名单（fail-closed）；远程 URL 必须 http(s)；argv key 白名单。
+- `runtime/cua.mjs` 工具名格式校验（fail-closed）；远程 URL 必须 http(s)；argv key 格式校验。
 - computer-server **无内置 token**——建议仅绑定本地/回环或防火墙只放行 docker 网段，或套 SSH 隧道。
 - 配置由操作者提供，不来自不可信信封。

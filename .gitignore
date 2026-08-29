@@ -2,6 +2,7 @@
 node_modules/
 dist/
 *.tsbuildinfo
+package-lock.json
 
 # Environment & secrets (never commit)
 .env
