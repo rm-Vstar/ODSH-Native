@@ -4,6 +4,11 @@ All notable changes to ODSH-Native are documented here. Format: Keep a Changelog
 
 ## [Unreleased]
 
+- Forward resident watcher callbacks; omitting the callback retains the existing no-op default.
+- Skip interval ticks while that task is in flight, clear busy state after success or failure, and prevent new dispatch after stop without cancelling active work.
+
+- Reassemble bounded WebSocket text messages across control frames, validate authentication and ready messages, and close/reject pending requests on malformed or partial frames without treating idle reads as disconnects. Atomically publish complete device identities without overwriting existing files; concurrent callers reuse the winner.
+
 - Apply one monotonic connection deadline across TCP, HTTP upgrade and authentication, including partial frame reads; close failed connections without changing runtime request timeouts.
 - Reject HTTP and business failures on every remote screenshot attempt; validate base64 image content and declared PNG/JPEG/WebP format before saving captures.
 

@@ -32,7 +32,8 @@ export default defineToolPlugin({
 // B-class resident support used by a factory tool variant (kept separate for clarity).
 export function startResidentServices(config = {}) {
   const wcfg = (config.watch || {});
-  const watcher = (wcfg.enabled && Array.isArray(wcfg.paths)) ? createWatcher({ paths: wcfg.paths }) : null;
+  // Omitted handler preserves createWatcher's no-op default for existing callers.
+  const watcher = (wcfg.enabled && Array.isArray(wcfg.paths)) ? createWatcher({ paths: wcfg.paths, handler: wcfg.handler }) : null;
   const scheduler = createScheduler((config.schedule || []));
   return { stop() { if (watcher) watcher.stop(); scheduler.stop(); } };
 }
