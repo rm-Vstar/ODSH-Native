@@ -8,7 +8,8 @@
       "odsh.exec",
       "odsh.cua",
       "odsh.visual",
-      "odsh.serve"
+      "odsh.serve",
+      "odsh.lease"
     ]
   },
   "activation": {

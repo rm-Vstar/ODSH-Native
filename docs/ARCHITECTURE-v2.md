@@ -1,105 +1,40 @@
-# ODSH-Native — 重构蓝图 (ARCHITECTURE v2)
+# ODSH-Native 架构
 
-**状态**: 重构设计稿（v2，取代 v1 的 standalone 定位）  
-**Goal**: 目标是成为一个**真正的 OpenClaw 插件**，具备 A 类（可执行 agent-tool）+ 部分 B 类（常驻后台/自动监听 + 承载 DSH Harness 插件）。
+本文描述当前源码。后续计划见 [ROADMAP](../ROADMAP.md)。
 
----
+## 原生插件入口
 
-## 1. 定位转变
+[package.json](../package.json) 声明源码入口与运行时入口，[插件清单](../openclaw.plugin.json) 声明五个工具。[src/index.ts](../src/index.ts) 使用宿主提供的 OpenClaw SDK 注册工具：
 
-**原 v1**: standalone Node 项目 + 自建 registry，把工具暴露给 OpenClaw（额外一层）。  
-**重构 v2**: **原生 OpenClaw 插件**。直接用 OpenClaw 官方插件机制注册 agent-tool，不再自建 bridge/gateway 那套"第二运行时"。
+| 工具 | 当前行为 |
+|---|---|
+| odsh.exec | 在宿主进程权限下以命令与参数数组执行本地程序 |
+| odsh.cua | 本地执行 cua-driver，或经 HTTP POST /cmd 调用远程 computer-server |
+| odsh.visual | 对指定图片进行本地 OCR，或抓取桌面帧后尝试 OCR；返回图片路径供调用方继续处理 |
+| odsh.serve | internal 模式执行本地子进程；remote 模式向配置的 HTTP worker 发送任务 |
+| odsh.lease | 可选的单进程桌面任务租约领取、续租和释放 |
 
-## 2. 目标能力面
+独立文件工具尚未注册。原生入口使用 [src/runtime](../src/runtime/exec.mjs) 中的实现；[src/tools](../src/tools/exec.mjs) 保留独立辅助入口，并非原生工具注册来源。
 
-| 类别 | 能力 | 通过 OpenClaw 何种机制 |
-|------|------|------|
-| A 类（执行） | exec / file / cua / visual / 自定义插件工具 | agent tool（`defineToolEntry` / `api.on("tool")`） |
-| B 类-1 | 常驻后台服务 / 自动监听 | plugin 生命周期 + `api.on("`调度/hook") + File watcher / scheduler |
-| B 类-2 | 承载 DSH Harness 插件 | 桥接执行后端（把 DSH 的 `ctx`-grade 能力作为受调的服务） |
-| （副） | 干净 sub-agent | 复用 OpenClaw 原生 `sessions_spawn` / `agent exec`（不重新造） |
+## 配置与执行边界
 
-## 3. OpenClaw 插件骨架（v2 新写）
+运行时配置来自宿主环境，插件配置 schema 当前为空。原生入口使用进程环境；独立 [bridge](../src/gateway/bridge.mjs) 会加载环境文件。详见[配置](CONFIGURATION.zh.md)。
 
-遵循官方规范（`docs.openclaw.ai/plugins/*`）：
+本地命令采用无 shell 的参数数组执行。CUA 校验工具名与参数键格式，远端地址要求 HTTP(S)。这些校验不构成命令授权或沙箱；操作者负责约束宿主权限和远端访问。
 
-### 3.1 清单
-`openclaw.plugin.json`（manifest，`contracts.tools` 声明） + `package.json`（`openclaw.extensions`、`type: module`、peer `openclaw`）。
+视觉实现优先使用本地 tesseract；OCR 不可用时返回路径及说明，由调用方选择多模态模型。截图目录优先采用 Linux 的 /dev/shm，其他环境回退系统临时目录；可显式配置目录。文件保留与访问权限由部署方管理。
 
-### 3.2 入口
-- 安装后：`extensions: ["./dist/index.js"]` / `runtimeExtensions`。
-- 源码开发：`extensions: ["./src/index.ts"]`（TypeScript ESM，对齐 OpenClaw 生态）。
+## 可选桌面协调
 
-### 3.3 注册 A 类工具
-用 `defineToolPlugin` / `api.on("tool")` 把现有 ODSH-Native 能力（exec、cua、visual、registry 插件）逐个注册为 OpenClaw agent-tool。
+租约保护同一已加载模块、同一 Node 进程中的受管 CUA/视觉调用，包括文件 OCR。任务在步骤间保留凭证，执行期间自动续租，空闲期间由调用方续租。执行失败或失租可能隔离资源，恢复需确认旧操作结束后重启进程。跨进程或外部桌面写入者需独立协调，详见[租约](LEASES.zh.md)。
 
-### 3.4 注册 B 类常驻服务
-- 用插件 hook 生命周期（`api.on("hook_name", handler)`，如 lifecycle/调度）挂常驻监听。
-- 或内置一个 scheduler / File watcher（成为 OpenClaw 的一个后台服务能力面）。
+## 独立辅助能力
 
-### 3.5 承载 DSH Harness 插件的桥接
-- 方式：OpenClaw 插件通过 agent-tool`spawn-dsh-worker`，把需在 DSH Harness 生命周期里执行的任务发给一个 DSH 常驻后端（Cordis worker），由它执行并回传。
-- （复用 DSH 侧 `odsh-bridge.ts` 那种 `ctx.effect(spawn)` 的能力）
+- [注册表](../src/registry.mjs) 发现插件目录下的清单并校验实现路径与真实路径。发现的工具由独立调用方执行，原生入口未将其注册为 OpenClaw 工具。第三方实现以进程权限运行，路径校验不是代码沙箱。
+- [常驻服务](../src/services/scheduler.mjs) 提供定时器与文件监听库；入口导出的常驻服务工厂由调用方显式启动和停止，插件注册不会自动启动这些服务。
+- [clean-exec](../src/worker/clean-exec.mjs) 封装宿主命令行的 agent exec。会话与上下文隔离语义由所用 OpenClaw 版本决定。
+- [网关客户端](../src/gateway/gateway-client.mjs) 为独立集成提供设备身份、配对与请求响应；原生工具注册无需连接此客户端。
 
-### 3.6 配置
-`configSchema`（`openclaw.plugin.json`，当前为空对象：无已接线的插件配置键，所有运行时开关走环境变量；无需额外校验依赖）。
+## 构建与检查
 
-## 4. 目录结构（重构后目标）
-
-```
-ODSH-Native/
-├─ openclaw.plugin.json        # manifest（contracts.tools + configSchema）
-├─ package.json                # openclaw.extensions / runtimeExtensions / peers
-├─ src/
-│  ├─ index.ts                 # 插件主入口(defineToolPlugin/definePluginEntry)
-│  ├─ tools/                    # A类: 每个一个 agent-tool
-│  │  ├─ exec.ts
-│  │  ├─ cua.ts
-│  │  ├─ visual.ts
-│  │  └─ file.ts
-│  ├─ registry/               # 加载 plugins/ 目录的 DSH 风格工具
-│  │  ├─ registry.ts
-│  │  └─ load-plugins.ts
-│  ├─ services/               # B 类: 常驻后台 / 监听
-│  │  ├─ watcher.ts   # File/目录监听触发 agent-tool
-│  │  └─ scheduler.ts # 定时任务
-│  ├─ harness/                # B 类: 承载 DSH 插件的桥
-│  │  └─ dsh-worker.ts # 调 DSH 常驻后端执行
-│  └─ worker/
-│     └─ clean-exec.ts        # 复用原生 agent exec/sessions_spawn
-├─ plugins/                   # 用户可放 DSH 风格工具插件(被 registry 发现)
-│  └─ example-plugin/
-│     ├─ manifest.json
-│     └─ tool.mjs
-├─ tests/
-└─ dist/                      # 构建产物(runtimeExtensions)
-```
-
-## 5. 复用现有代码
-- `src/tools/exec.mjs`、`src/tools/cua.mjs`、`src/tools/visual.mjs`、`src/registry.mjs`、`plugins/example-plugin`：薄封装成 TS/ESM 的 agent-tool（直接搬逻辑，改注册面）。
-- `src/gateway/*`：**保留 as-is**（可能用于"调用 OpenClaw 其他工具"的客户端能力，或不再必要）。
-- `scripts/check.mjs / test.mjs`：保留，加对 TS/SDK 入口的 check。
-
-## 6. 与现有 ODSH-Bridge for Docker 的关系
-- ODSH-Native v2 是上位替代:同为"把 DSH 能力给 OpenClaw",但走**原生插件**而非**双容器+桥**。
-- 保留复用:registry 的 fail-closed 安全传统、exec/cua 工具、DSH 插件发现。
-
-## 7. 需要确认(决策)
-1. 插件入口用 TS(`src/index.ts`)还是保留 `.mjs`? → 默认租 VS(对齐 OpenClaw 插件生态; TS ESM)
-2. `openclaw` peer 版本兼容(2026.3.24+ beta 接口)
-3. B 类: 内置 watcher/scheduler 由插件自带,还是用 OpenClaw 的 cron hook?
-4. DSH-Harness 桥: 是**远程调用一个 DSH 常驻**(跨进程),还是**宿主内嵌**一个 DSH worker 子进程(更贴本机)?
-
-## 8. 实现状态 (2026-08-28)
-
-- [x] openclaw.plugin.json: manifest (contracts.tools: odsh.exec/cua/visual/serve + configSchema)
-- [x] package.json: plugin form (extensions + runtimeExtensions + peer openclaw)
-- [x] src/index.ts: 主入口 (defineToolPlugin + 4 A 类 agent tools + B 类生命周期) -- Node24 strip-types 通过
-- [x] src/runtime/{exec,cua,visual,dsh-worker}.mjs: A 类执行工具 + B 类 DSH worker 桥 (internal/remote)
-- [x] src/services/{watcher,scheduler}.mjs: B 类常驻后台服务
-- [x] scripts/build.mjs -> dist/index.js (runtimeExtensions 产物, 可 import)
-- [x] 测试: 19 cases 全 PASS (cua4 + registry4 + plugin-load3 + runtime3 + services2 + dsh-worker2 + security1); check ALL_SYNTAX_OK(mjs/js/ts 全覆盖, 含 src/index.ts)
-- [ ] 真连 DSH 后端 (DSH_WORKER_ENDPOINT) 端到端 (internal 已验证)
-- [x] 真 OpenClaw plugin-sdk 加载验证: 用 npm openclaw@2026.7.1-2 的 plugin-sdk/tool-plugin 加载 plugin, 注册 4 tools 并真实执行 odsh.exec(round-trip ok) -- 本环境已实证
-
----
+构建脚本从源码入口生成 [dist/index.js](../dist/index.js)，将运行时和服务导入路径指回源码目录，并检查生成文件语法。因此安装包应保留完整源码依赖，而非仅复制构建入口。检查命令与发布步骤见[运维](OPERATIONS.zh.md)和[维护](../MAINTENANCE.md)。

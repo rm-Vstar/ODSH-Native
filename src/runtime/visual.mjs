@@ -1,3 +1,4 @@
+import { withDesktopLease } from "./lease.mjs";
 // src/runtime/visual.mjs - A-class tool: describe a screenshot/image (OCR / vision backend).
 // Zero-dependency, cross-platform, fail-safe. Backends probed in order:
 //   1. tesseract CLI (TESSERACT_BIN or on PATH) for local OCR.
@@ -44,10 +45,25 @@ async function writeBase64Images(items) {
   const written = [];
   for (const it of (items || [])) {
     if (!it || typeof it.data_base64 !== 'string') continue;
-    const mime = it.mime_type || 'image/png';
-    const ext = mime.includes('jpeg') ? 'jpg' : mime.includes('webp') ? 'webp' : 'png';
+    const encoded = it.data_base64;
+    if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded) || !encoded) continue;
+    const bytes = Buffer.from(encoded, 'base64');
+    if (bytes.toString('base64') !== encoded) continue;
+    let detected = null;
+    if (bytes.length >= 45 && bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10])) &&
+        bytes.readUInt32BE(8) === 13 && bytes.toString('ascii', 12, 16) === 'IHDR' &&
+        bytes.readUInt32BE(16) > 0 && bytes.readUInt32BE(20) > 0 &&
+        bytes.subarray(-12).equals(Buffer.from([0,0,0,0,73,69,78,68,174,66,96,130]))) detected = 'image/png';
+    else if (bytes.length >= 16 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 &&
+        bytes[bytes.length - 2] === 255 && bytes[bytes.length - 1] === 217) detected = 'image/jpeg';
+    else if (bytes.length >= 30 && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.readUInt32LE(4) + 8 === bytes.length &&
+        bytes.toString('ascii', 8, 12) === 'WEBP' && ['VP8 ', 'VP8L', 'VP8X'].includes(bytes.toString('ascii', 12, 16)) &&
+        bytes.readUInt32LE(16) > 0 && bytes.readUInt32LE(16) <= bytes.length - 20) detected = 'image/webp';
+    const mime = String(it.mime_type || detected || '').toLowerCase();
+    if (!detected || mime !== detected) continue;
+    const ext = mime === 'image/jpeg' ? 'jpg' : mime === 'image/webp' ? 'webp' : 'png';
     const f = join(CAP_DIR, 'desktop-' + process.pid + '-' + Date.now() + '-' + written.length + '.' + ext);
-    try { await writeFile(f, Buffer.from(it.data_base64, 'base64')); written.push(f); } catch { /* skip bad image */ }
+    try { await writeFile(f, bytes); written.push(f); } catch { /* skip bad image */ }
   }
   return written;
 }
@@ -65,9 +81,9 @@ export function parseRemoteScreenshot(text) {
     let j = null;
     try { j = JSON.parse(line.slice(6).trim()); } catch { continue; }
     if (!j) continue;
-    if (j.success === false) return { ok: false, error: j.error || 'remote screenshot failed' };
-    if (Array.isArray(j.images) && j.images.length) { images = j.images; break; }
-    if (typeof j.image_data === 'string' && j.image_data) { single = j.image_data; break; }
+    if (j.success === false || j.ok === false || j.error) return { ok: false, error: j.error || 'remote screenshot failed' };
+    if (Array.isArray(j.images) && j.images.length) images = j.images;
+    if (typeof j.image_data === 'string' && j.image_data) single = j.image_data;
   }
   if (images) return { ok: true, images };
   if (single) return { ok: true, images: [{ data_base64: single, mime_type: 'image/png' }] };
@@ -87,14 +103,15 @@ async function remoteScreenshot() {
       body: JSON.stringify({ command, params: {} }),
       signal: AbortSignal.timeout(60000),
     });
-    return { status: r.status, text: await r.text() };
+    const text = await r.text();
+    return { status: r.status, text, parsed: r.ok ? parseRemoteScreenshot(text) : { ok: false, error: 'remote screenshot HTTP ' + r.status } };
   };
   try {
     let resp = await attempt('get_desktop_state');
-    let parsed = parseRemoteScreenshot(resp.text);
+    let parsed = resp.parsed;
     if (resp.status >= 400 || !parsed.ok) {
       resp = await attempt('screenshot');
-      parsed = parseRemoteScreenshot(resp.text);
+      parsed = resp.parsed;
     }
     if (!parsed.ok) return { ok: false, remote: true, error: parsed.error || 'remote capture failed (tried get_desktop_state + screenshot)' };
     const written = await writeBase64Images(parsed.images);
@@ -109,23 +126,32 @@ async function remoteScreenshot() {
 // directory may be shared/rotated by other captures, so a name listed by readdir can
 // already be gone or half-written — fall back to older files instead of returning a
 // stale or non-existent path).
-async function pickLatestImage() {
-  const names = (await readdir(CAP_DIR)).filter((n) => /\.(png|jpe?g|webp)$/i.test(n)).sort();
-  for (let i = names.length - 1; i >= 0; i--) {
-    const cand = join(CAP_DIR, names[i]);
-    try { if ((await stat(cand)).isFile()) return cand; } catch { /* removed/replaced concurrently — try older */ }
+async function imageSnapshot() {
+  const images = new Map();
+  for (const name of (await readdir(CAP_DIR)).filter((n) => /\.(png|jpe?g|webp)$/i.test(n))) {
+    const file = join(CAP_DIR, name);
+    try {
+      const info = await stat(file);
+      if (info.isFile()) images.set(file, info);
+    } catch { /* removed concurrently */ }
   }
-  return null;
+  return images;
+}
+
+async function pickLatestImage(before) {
+  const candidates = [...await imageSnapshot()].filter(([file, info]) => {
+    const old = before.get(file);
+    return info.size > 0 && (!old || info.mtimeMs !== old.mtimeMs || info.ctimeMs !== old.ctimeMs || info.size !== old.size || info.ino !== old.ino);
+  }).sort((a, b) => b[1].mtimeMs - a[1].mtimeMs);
+  return candidates[0]?.[0] || null;
 }
 
 async function localCaptureScreen(cuaPath) {
   await mkdir(CAP_DIR, { recursive: true });
-  const out = join(CAP_DIR, 'desktop-' + process.pid + '-' + Date.now() + '.png');
   try {
+    const before = await imageSnapshot();
     await run(cuaPath, ['get_desktop_state'], { timeout: 60000, maxBuffer: 64 * 1024 * 1024 });
-    let found = null;
-    try { if ((await stat(out)).isFile()) found = out; } catch { /* not there */ }
-    if (!found) found = await pickLatestImage();
+    const found = await pickLatestImage(before);
     if (!found) return { ok: false, error: 'cua-driver ran but produced no image file' };
     return { ok: true, path: found };
   } catch (e) {
@@ -133,7 +159,7 @@ async function localCaptureScreen(cuaPath) {
   }
 }
 
-export async function describeVisual({ path, image } = {}) {
+async function describeVisualUnchecked({ path, image } = {}) {
   const src = path || image || null;
   let st = null;
   if (src) { try { st = await stat(src); } catch { st = null; } }
@@ -169,3 +195,4 @@ export async function describeVisual({ path, image } = {}) {
 
   return { ok: true, engine: 'none', path: src, size: st.size, note: 'no local OCR backend detected; pass to a multimodal model for description' };
 }
+export async function describeVisual(params = {}) { return withDesktopLease(params.leaseToken, () => describeVisualUnchecked(params)); }

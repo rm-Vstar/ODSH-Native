@@ -12,8 +12,8 @@ node scripts/build.mjs  # emit dist/index.js
 
 ## Standards (aligned with ODSH-Bridge for Docker)
 
-- English is primary; provide `.zh.md` alongside any `docs/*.md`.
-- Keep bins/env fail-closed: argv allowlist, tool-name whitelists, no real secrets.
+- Keep English and Chinese reader guides aligned; architecture and maintainer references may remain single-language.
+- Keep bins/env fail-closed: shell-free argument arrays, CUA tool/key format checks, registry path containment and operator-managed secrets. These checks are not a sandbox.
 - Every behavior change: bump version, add CHANGELOG entry.
 - Each release runs `npm run check` + `npm test` (`ALL_SYNTAX_OK` / `ALL TESTS PASSED`).
 

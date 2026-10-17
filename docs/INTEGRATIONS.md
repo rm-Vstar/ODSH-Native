@@ -2,8 +2,8 @@
 
 ## As an OpenClaw plugin (recommended)
 
-1. Add ODSH-Native to the OpenClaw plugin roots (copy `src/`, `openclaw.plugin.json`, `package.json` into a plugin dir, or publish and `openclaw plugins install`).
-2. Verify `/tools` lists `odsh.exec`, `odsh.cua`, `odsh.visual`, `odsh.serve`.
+1. Add ODSH-Native to the OpenClaw plugin roots (install the complete built checkout, including src/, dist/ and both manifests, into a plugin directory, or publish and `openclaw plugins install`).
+2. Verify `/tools` lists `odsh.exec`, `odsh.cua`, `odsh.visual`, `odsh.serve`, `odsh.lease`.
 3. `npm run check` + `npm test` run the self-tests.
 
 ## Install from ClawHub (published)
@@ -18,8 +18,8 @@ openclaw plugins install clawhub:odsh-native --acknowledge-clawhub-risk
 
 ## Cua desktop/vision
 
-- `odsh.cua` spawns `cua-driver` locally (trycua/cua).
-- Supports Windows / macOS / Linux background computer use without stealing focus.
+- `odsh.cua` spawns cua-driver locally or uses the configured remote computer-server.
+- Desktop availability, permissions and focus behavior depend on the backend and command; see [desktop execution](CUA-EXECUTION.md).
 
 ## DSH Harness worker bridge
 

@@ -1,6 +1,6 @@
 # CUA 桌面执行
 
-ODSH-Native 通过 **cua-driver** 兼容的 server 驱动桌面/视觉。两种可选模式，保证宿主环境与 docker 环境都有最简连接方式：
+ODSH-Native 通过 **cua-driver** 兼容的 server 驱动桌面/视觉。两种模式分别用于同机驱动与远程桌面：
 
 | 模式 | 适用场景 | 方式 |
 |---|---|---|
@@ -13,52 +13,13 @@ ODSH-Native 通过 **cua-driver** 兼容的 server 驱动桌面/视觉。两种�
 
 ### 本地（宿主安装，最简单）
 - 安装 cua-driver（见 github.com/trycua/cua）：Windows PowerShell / macOS-Linux curl 安装脚本。
-- 若二进制不在 PATH，在 `.env` 设 `CUA_DRIVER`。
+- 若二进制不在 PATH，在宿主环境设置 CUA_DRIVER。
 
-### 远程（docker → 宿主桌面，经 computer-server）——宿主前置：必须开一个端口
+### 远程桌面
 
-Windows/macOS 宿主必须运行 `cua-computer-server`，并把它默认 `8000` 的 HTTP 端口暴露给
-OpenClaw 容器。**没有这个服务，插件远程模式只会返回 `{ok:false, error:"fetch failed"}`**——
-光设环境变量不够。
+在交互桌面会话中运行兼容的 computer-server。其 HTTP 端点须对插件宿主可达，并仅向可信客户端开放。启动前在 OpenClaw 服务/容器环境设置 CUA_REMOTE，然后重启该进程。安装及启动参数以所用服务版本的文档为准。
 
-1. 在宿主（交互会话）安装并启动 server：
-
-   **PyPI `cua-computer-server` 0.1.25**（2026-08 实测，openinterpreter 系——自带
-   ODSH-Native 使用的 `POST /cmd` + SSE 协议，**无需 `[driver]` extra**）：
-   ```powershell
-   pip install cua-computer-server
-   python -m computer_server --host 0.0.0.0 --port 8000
-   ```
-   > ⚠️ GitHub 主线参数（`--backend cua-driver --capture-scope desktop`）与 `[driver]` extra
-   > 仅 **trycua 主线**支持；PyPI 0.1.25 会拒绝（`unrecognized arguments`）。若你用 GitHub
-   > 主线，则用那套命令。无论哪种，`--host 0.0.0.0` 都必须有，容器才能访问该端口。
-   > Windows 上 `No module named 'win32api'` 只是警告；`pip install pywin32` 可消除。
-
-2. 先验证 server 再动 OpenClaw：
-   ```powershell
-   curl http://localhost:8000/status
-   # {"status":"ok","os_type":"windows"}
-   ```
-
-3. 在 OpenClaw **容器**里设置端点。`CUA_REMOTE` 从环境读取，需经 OpenClaw 配置注入
-   （如 `env.vars`）。⚠️ **必须完整重启容器/进程**——gateway 热重载（SIGUSR1）不会重新读
-   环境，插件会继续走本地模式（`spawn cua-driver ENOENT`）。
-   ```env
-   CUA_REMOTE=http://host.docker.internal:8000
-   ```
-   从 `odsh.cua` 的返回判断当前模式：
-   - 本地模式 → `{ok:false, error:"spawn cua-driver ENOENT"}`
-   - 远程模式、服务未起 → `{ok:false, remote:true, error:"fetch failed"}`（环境已生效，去启动服务）
-   - 远程模式、正常 → `{ok:true, remote:true, ...}`
-
-4. `odsh.cua` / `odsh.visual`（无 path 截图）即通过 `POST /cmd`（SSE）操作宿主桌面。
-   `odsh.visual` 在 Linux 上把截图存到 `/dev/shm/odsh-visual`（tmpfs 内存盘——不写持久盘；
-   可用 `ODSH_VISUAL_DIR` 覆盖）。
-
-> 可选：直接在 OpenClaw 注册远程 MCP（无需 ODSH-Native 代码）：
-> ```bash
-> openclaw mcp set cua-driver '{"url":"http://host.docker.internal:8000/mcp","transport":"streamable-http"}'
-> ```
+插件调用 POST /cmd 并解析 SSE 响应。odsh.cua 原样转发命令名，需选择后端支持的命令；odsh.visual 先尝试 get_desktop_state，再尝试 screenshot。插件不发送 CUA 鉴权头，应通过网络控制或与客户端兼容的认证代理保护访问。
 
 ## 命令映射——0.1.25 vs trycua 主线
 
@@ -73,14 +34,16 @@ OpenClaw 容器。**没有这个服务，插件远程模式只会返回 `{ok:fal
 
 ## 工具
 
-- `odsh.cua` — image / click / keyboard / browser（CDP），后台且 focus-safe。按 `CUA_REMOTE`
+- `odsh.cua` — image / click / keyboard / browser（CDP），焦点行为取决于后端与命令。按 `CUA_REMOTE`
   探测本地 `cua-driver` 或远程 computer-server。
-- `odsh.visual` — 无图片路径时抓实时桌面帧（本地 cua-driver 或远程 computer-server），存到
-  `/dev/shm/odsh-visual`（内存），然后**一步 OCR**：装有 tesseract 时直接返回 `text`
+- `odsh.visual` — 无图片路径时抓实时桌面帧（本地 cua-driver 或远程 computer-server），存到配置的截图目录，然后**一步 OCR**：装有 tesseract 时直接返回 `text`
   （无需外部视觉模型）。
 
 ## 安全
 
 - `runtime/cua.mjs` 工具名格式校验（fail-closed）；远程 URL 必须 http(s)；argv key 格式校验。
-- computer-server **无内置 token**——建议仅绑定本地/回环或防火墙只放行 docker 网段，或套 SSH 隧道（见上：端口必须可达，但别让它被陌生人可达）。
+- 将远程桌面访问限制为可信调用方；插件自身不提供桌面服务认证。
 - 配置由操作者提供，不来自不可信信封。
+## 截图存储与协调
+
+Linux 存在 /dev/shm 时使用 /dev/shm/odsh-visual，其他系统使用系统临时目录；ODSH_VISUAL_DIR 可覆盖。应配置本地驱动将截图写入同一目录：捕获仅接受本次调用期间新增或变化的图片。共享目录中的并发截图未与具体生产者绑定。插件会保留截图文件，应按保留策略配置访问权限与清理。可选[桌面租约](LEASES.zh.md)协调同一已加载模块、同一 Node 进程中的受管调用，包括纯文件 OCR。

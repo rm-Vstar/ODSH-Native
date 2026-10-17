@@ -18,6 +18,7 @@ const files = (() => { try { return readdirSync(dir).filter((f)=>f.endsWith('.te
 if (!files.length) { console.error('no tests found in tests/'); process.exit(1); }
 let failures = 0;
 let cases = 0;
+let skipped = 0;
 for (const file of files) {
   const mod = await import(pathToFileURL(join(dir, file)).href);
   const exportable = typeof mod.default === 'function' ? { default: mod.default } : mod;
@@ -25,7 +26,13 @@ for (const file of files) {
   const suiteTests = Object.entries(exportable).filter(([name, fn]) => name.startsWith('t_') && typeof fn === 'function');
   cases += suiteTests.length;
   for (const [name, fn] of suiteTests) {
-    try { await fn(t); console.log('PASS ' + file + ' :: ' + name); }
+    try {
+      const result = await fn(t);
+      if (typeof result === 'string' && result.startsWith('SKIP:')) {
+        skipped++;
+        console.log('SKIP ' + file + ' :: ' + name + ' — ' + result.slice(5).trim());
+      } else console.log('PASS ' + file + ' :: ' + name);
+    }
     catch (e) { failures++; console.error('FAIL ' + file + ' :: ' + name + ' — ' + e.message); }
   }
 }
@@ -34,5 +41,6 @@ if (cases < MIN_CASES) {
     ' file(s) — expected at least ' + MIN_CASES + ' (a suite may have quietly exported nothing)');
   process.exit(1);
 }
+console.log('SUMMARY: ' + (cases - skipped - failures) + ' passed, ' + skipped + ' skipped, ' + failures + ' failed');
 if (failures) { console.error(failures + ' failed'); process.exit(1); }
 console.log('ALL TESTS PASSED (' + files.length + ' test file(s), ' + cases + ' case(s))');

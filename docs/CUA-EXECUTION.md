@@ -14,54 +14,13 @@ Both are fail-closed: tool-name format check, no shell, http(s)-only remote URL,
 
 ### Local (host install, simplest)
 - Install cua-driver (see https://github.com/trycua/cua): Windows PowerShell `irm https://cua.ai/driver/install.ps1 | iex`, macOS/Linux curl installer.
-- Set `CUA_DRIVER` in `.env` if the binary is not on PATH.
+- Set `CUA_DRIVER` in the host environment if the binary is not on PATH.
 
-### Remote (docker → host desktop via computer-server) — host prerequisite: a port must be open
+### Remote desktop
 
-The Windows/macOS host must run a `cua-computer-server` and **expose its HTTP port** (default
-`8000`) to the OpenClaw container. Without this server the plugin's remote mode answers
-`{ok:false, error:"fetch failed"}` — the environment variable alone is not enough.
+Run a compatible computer-server in an interactive desktop session. Its HTTP endpoint must be reachable from the plugin host and restricted to trusted clients. Configure CUA_REMOTE in the OpenClaw service/container environment before startup, then restart that process. Use the server version’s documented installation and launch options.
 
-1. On the host (interactive session) install and start the server:
-
-   **PyPI `cua-computer-server` 0.1.25** (verified 2026-08, openinterpreter line — ships the
-   `POST /cmd` + SSE protocol ODSH-Native speaks, exactly; **no `[driver]` extra needed**):
-   ```powershell
-   pip install cua-computer-server
-   python -m computer_server --host 0.0.0.0 --port 8000
-   ```
-   > ⚠️ The GitHub-mainline flags (`--backend cua-driver --capture-scope desktop`) and the
-   > `[driver]` extra are **trycua 主线 only**; PyPI 0.1.25 rejects them (`error: unrecognized
-   > arguments`). If you are on the GitHub mainline instead, use that invocation. Either way
-   > `--host 0.0.0.0` is required so the container can reach the port.
-   > `No module named 'win32api'` on Windows is only a warning; `pip install pywin32` silences it.
-
-2. Verify the server before touching OpenClaw:
-   ```powershell
-   curl http://localhost:8000/status
-   # {"status":"ok","os_type":"windows"}
-   ```
-
-3. In the OpenClaw **container** set the endpoint. `CUA_REMOTE` is read from the environment, so
-   inject it via the OpenClaw config (e.g. `env.vars`). ⚠️ **A full container/process restart is
-   required** — gateway hot-reload (SIGUSR1) does not re-read the environment, so the plugin
-   would keep trying local mode (`spawn cua-driver ENOENT`).
-   ```env
-   CUA_REMOTE=http://host.docker.internal:8000
-   ```
-   How to tell which mode is live from an `odsh.cua` answer:
-   - local mode → `{ok:false, error:"spawn cua-driver ENOENT"}`
-   - remote mode, server down → `{ok:false, remote:true, error:"fetch failed"}` (env is live, start the server)
-   - remote mode, working → `{ok:true, remote:true, ...}`
-
-4. `odsh.cua` / `odsh.visual` (no-path capture) now talk to the host desktop via `POST /cmd`
-   (SSE). `odsh.visual` keeps screenshots in `/dev/shm/odsh-visual` on Linux (tmpfs, in RAM — no
-   persistent-disk writes; override with `ODSH_VISUAL_DIR`).
-
-> Optionally register the remote MCP directly in OpenClaw (no ODSH-Native code needed):
-> ```bash
-> openclaw mcp set cua-driver '{"url":"http://host.docker.internal:8000/mcp","transport":"streamable-http"}'
-> ```
+The plugin calls POST /cmd and parses SSE responses. odsh.cua forwards command names unchanged; choose names supported by your backend. odsh.visual tries get_desktop_state and then screenshot. The plugin sends no CUA authentication header; protect access with network controls or an authenticated proxy compatible with this client.
 
 ## Command map — 0.1.25 vs trycua 主线
 
@@ -77,14 +36,17 @@ The two computer-server lines use **different command names**. ODSH-Native norma
 
 ## Tools
 
-- `odsh.cua` — image / click / keyboard / browser (CDP), background & focus-safe. Probes the
+- `odsh.cua` — image / click / keyboard / browser (CDP), focus behavior depends on the backend and command. Probes the
   local `cua-driver` or the remote computer-server depending on `CUA_REMOTE`.
 - `odsh.visual` — with no image path, grabs a live frame (local cua-driver or remote
-  computer-server), stores it under `/dev/shm/odsh-visual` (in RAM), then **OCR-fast-paths it**:
+  computer-server), stores it in the configured capture directory, then **OCR-fast-paths it**:
   when tesseract is installed the reply carries `text` immediately (no external vision model).
 
 ## Security
 
 - Tool-name format check (fail-closed) in `runtime/cua.mjs`; remote URL must be http(s); argv keys format-checked.
-- Remote mode has **no built-in token in computer-server** — bind it locally or firewall to your docker subnet, or wrap in SSH (see the host-prerequisite note above: the port must be reachable, so do not let it be reachable by rand).
+- Restrict remote desktop access to trusted callers; the plugin does not provide desktop-server authentication.
 - Config comes from the operator, not from untrusted envelopes.
+## Capture storage and coordination
+
+Linux uses /dev/shm/odsh-visual when /dev/shm exists; other systems use the OS temporary directory. ODSH_VISUAL_DIR overrides this selection. Configure the local driver to write frames into the same directory: capture accepts only images created or changed during that call. Shared-directory concurrent captures are not associated with a specific producer. The plugin retains captured files; configure access permissions and cleanup according to your retention policy. Optional [desktop leases](LEASES.md) coordinate guarded calls in one loaded module in one Node process, including file-only OCR.

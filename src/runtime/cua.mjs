@@ -1,3 +1,4 @@
+import { withDesktopLease } from "./lease.mjs";
 // src/runtime/cua.mjs — A-class tool: drive CUA (cua-driver / computer-server).
 // Two modes, selected by CUA_REMOTE (optional):
 //   * empty        -> LOCAL  : execFile('cua-driver', ...) on this host (host install).
@@ -45,7 +46,7 @@ async function remoteCua(tool, argsObj, timeoutMs) {
   }
 }
 
-export async function runCua({ tool, args = {}, timeoutMs = 60000 } = {}) {
+async function runCuaUnchecked({ tool, args = {}, timeoutMs = 60000 } = {}) {
   if (!tool || !TOOL_RE.test(String(tool))) return { ok: false, error: 'invalid/empty cua tool' };
   if (REMOTE) return remoteCua(tool, args, timeoutMs);
 
@@ -65,3 +66,4 @@ export async function runCua({ tool, args = {}, timeoutMs = 60000 } = {}) {
     return { ok: false, code: typeof e.code === 'number' ? e.code : null, error: e.stderr || e.message };
   }
 }
+export async function runCua(params = {}) { return withDesktopLease(params.leaseToken, () => runCuaUnchecked(params)); }

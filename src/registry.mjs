@@ -25,10 +25,16 @@ export class Registry {
     let manifest;
     try { manifest = JSON.parse(await readFile(join(p, 'manifest.json'), 'utf8')); }
     catch { manifest = { name, tools: [] }; }
-    if (!manifest.tools) manifest.tools = [];
-    for (const t of manifest.tools) {
-      if (!TOOL_NAME_RE.test(t.name)) {
-        console.warn('[registry] skip bad tool name:', t.name);
+    if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest) ||
+        (manifest.tools !== undefined && !Array.isArray(manifest.tools))) {
+      console.warn('[registry] skip invalid manifest:', name);
+      return this;
+    }
+    for (const t of manifest.tools || []) {
+      if (!t || typeof t !== 'object' || Array.isArray(t) ||
+          typeof t.name !== 'string' || !TOOL_NAME_RE.test(t.name) ||
+          (t.impl !== undefined && (typeof t.impl !== 'string' || !t.impl))) {
+        console.warn('[registry] skip invalid tool entry:', name);
         continue;
       }
       try {
@@ -51,7 +57,12 @@ export class Registry {
           continue;
         }
         const mod = await import(pathToFileURL(implPath).href);
-        this.tools.set(t.name, { plugin: name, manifest, t, run: mod.run || mod.default });
+        const run = mod.run || mod.default;
+        if (typeof run !== 'function') {
+          console.warn('[registry] skip non-callable tool:', name + '/' + t.name);
+          continue;
+        }
+        this.tools.set(t.name, { plugin: name, manifest, t, run });
       } catch (err) {
         console.warn('[registry] failed to load', name + '/' + t.name, err.message);
       }

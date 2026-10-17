@@ -4,6 +4,17 @@ All notable changes to ODSH-Native are documented here. Format: Keep a Changelog
 
 ## [Unreleased]
 
+- Apply one monotonic connection deadline across TCP, HTTP upgrade and authentication, including partial frame reads; close failed connections without changing runtime request timeouts.
+- Reject HTTP and business failures on every remote screenshot attempt; validate base64 image content and declared PNG/JPEG/WebP format before saving captures.
+
+- Read complete bounded HTTP upgrade headers without per-byte delays; retain coalesced WebSocket challenge bytes and report header timeout/truncation/size errors.
+- Isolate malformed plugin manifests and tool entries while retaining lexical and real-path containment checks.
+- Fail plugin-load checks on actual import errors; report a missing OpenClaw peer as a distinct skip, counted by the runner.
+- Reject unchanged historical local screenshots; keep the existing driver command contract. Shared-directory concurrent capture ownership is not guaranteed.
+- Clarify that environment files are not automatically loaded by this plugin.
+- Add opt-in single-process task leases with random bearer capabilities, monotonic expiry, working-time renewal, stale-token rejection, and conservative failure quarantine.
+- Guard runtime and legacy CUA/visual entry points; add odsh.lease. Default remains off; coordination covers guarded calls within one loaded module in one Node process.
+
 **Cleanup 2026-08-29: remove the planned-but-never-implemented web-search feature** (SERPdive +
 TinyFish is a separate DSH-side project, out of scope for ODSH-Native).
 
@@ -18,7 +29,7 @@ not implemented" and ships no code; it belongs to another project.
 - `CHANGELOG.md` history: entries that described the planned web-search feature were updated
   to reflect its removal (the feature never shipped).
 
-**CUA 打通 validation round (2026-08-29, from the Docker→host CUA integration summary)**.
+**Desktop capture and OCR updates.**
 
 ### Added
 
@@ -29,25 +40,25 @@ not implemented" and ships no code; it belongs to another project.
   first, falling back to `screenshot` (PyPI `cua-computer-server` 0.1.25, openinterpreter 系)
   on 4xx / no-image. Response parser (`parseRemoteScreenshot`, exported for tests) accepts
   both `images[]` and `image_data` shapes and fails closed on `success:false` / no data.
-- Captures go to `/dev/shm/odsh-visual` on Linux (tmpfs — in RAM, no persistent-disk write),
+- Captures go to `/dev/shm/odsh-visual` on Linux (tmpfs when available),
   falling back to the OS tmp dir elsewhere; override with `ODSH_VISUAL_DIR`.
 
 ### Docs
 
 - `docs/CUA-EXECUTION(.zh).md` rewritten: host prerequisite now states **a port must be open**
-  (no server → `fetch failed`), the verified PyPI 0.1.25 command (`pip install
+  (no server → `fetch failed`), the version-specific PyPI 0.1.25 command (`pip install
   cua-computer-server` + `python -m computer_server --host 0.0.0.0 --port 8000`, no `[driver]`
   extra, no GitHub-mainline flags), the 0.1.25 ↔ trycua command map, and the **full restart
   required** note for `CUA_REMOTE` via `env.vars` (hot-reload does not re-read env).
-- README (EN/zh) host prerequisite updated to the same verified 0.1.25 instructions + restart
+- README (EN/zh) host prerequisite updated to the same version-specific 0.1.25 instructions + restart
   caveat; `odsh.visual`/`odsh.cua` tool descriptions in `src/index.ts` now state the
   computer-server prerequisite explicitly for agents.
 
-**Security hardening + robustness round (2026-08-29):** see below.
+
 
 ---
 
-**Audit round 2026-08-29 (round 2): security hardening + robustness.**
+**Security and robustness updates.**
 
 ### Security
 
@@ -84,7 +95,7 @@ not implemented" and ships no code; it belongs to another project.
 - New `tests/gateway-client.test.mjs`: keepalive ping frame is a masked, empty
   RFC 6455 ping.
 
-**Audit round 2026-08-29: test-harness truth, doc honesty, least-privilege, wiring cleanup.**
+**Security and robustness updates.**
 
 ### Fixed
 
@@ -143,7 +154,7 @@ not implemented" and ships no code; it belongs to another project.
 
 - `CUA_REMOTE` env selects a **remote** CUA backend: `odsh.cua` and `odsh.visual` now talk to a `cua-computer-server` over HTTP (`POST /cmd`, SSE) when set, e.g. `CUA_REMOTE=http://host.docker.internal:8000`. Empty keeps the local `cua-driver` path (host install, simplest).
 - `odsh.visual` no-path capture works in remote mode too: fetches `get_desktop_state`, persists base64 images under `<tmpdir>/odsh-visual/`, then runs local OCR.
-- Remote mode is fail-closed: http(s)-only URL, tool/key whitelist, remote failures surface as `{ok:false}`.
+- Remote mode is fail-closed: http(s)-only URL, tool/key format checks, remote failures surface as `{ok:false}`.
 - Tests: `tests/cua.test.mjs` covers remote/local selection, invalid URL, bad argv key, unreachable remote, and local invalid-tool rejection (each in a subprocess to pick up env per-mode).
 
 ### Changed
@@ -186,7 +197,7 @@ not implemented" and ships no code; it belongs to another project.
 
 - `runtime/visual.mjs` no longer fabricates a screenshot path when capturing via `cua-driver`: it reuses a stable scratch dir and verifies an image actually exists before returning `ok:true` (was returning a non-existent `desktop.png` and leaking one temp dir per call).
 - `runtime/exec.mjs` returns `{ok:false}` for a missing `cmd` instead of throwing a raw exception (consistent fail-closed convention).
-- `runtime/cua.mjs` now forwards `args` as `--key value` (keys whitelisted) instead of silently dropping them; empty/invalid tool returns `{ok:false}`.
+- `runtime/cua.mjs` now forwards `args` as `--key value` (keys format-checked) instead of silently dropping them; empty/invalid tool returns `{ok:false}`.
 - `registry.mjs` fail-closed containment: a plugin `impl` that resolves outside `pluginsDir` (`../` traversal / arbitrary import) is skipped with a warning.
 - `runtime/dsh-worker.mjs` internal no-command mode reports `{ok:false}` truthfully (was a fake echo that claimed to "execute a DSH task"); remote mode now sends an optional `DSH_WORKER_TOKEN` Bearer header.
 
@@ -215,8 +226,8 @@ not implemented" and ships no code; it belongs to another project.
 - `AUTHORS.md`, `.gitignore`, `.env.example` (bilingual).
 - `tests/security.test.mjs` privacy/secret scan wired into `npm test`.
 
-### Fixed / Verified
-- Real-SDK plugin load verified: registers 4 tools and executes `odsh.exec` round-trip under `openclaw@2026.7.1-2`.
+### Fixed
+- Added SDK-based plugin registration and command execution checks.
 - Cross-platform `check`/`test` via `--experimental-strip-types`; skip graph when the peer `openclaw` is absent.
 
 ## [0.1.0] - earlier

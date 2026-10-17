@@ -1,13 +1,15 @@
 // tests/plugin-load.test.mjs - loads the OpenClaw plugin under the real openclaw plugin-sdk.
 // Skips when the openclaw peer package is not installed in this checkout.
 let entry = null;
-let skip = true;
-let skipNote = "openclaw peer not installed - plugin-load skipped";
+let skip = false;
+const skipNote = "openclaw peer not installed - plugin-load skipped";
 try {
-  const pluginMod = await import("../src/index.ts");
-  entry = pluginMod.default;
-  skip = false;
-} catch (e) { skipNote = "openclaw SDK unavailable: " + e.message; }
+  import.meta.resolve("openclaw/plugin-sdk/tool-plugin");
+} catch (e) {
+  if (e.code === 'ERR_MODULE_NOT_FOUND' && /^Cannot find package 'openclaw' imported from /.test(e.message)) skip = true;
+  else throw e;
+}
+if (!skip) entry = (await import("../src/index.ts")).default;
 
 export async function t_plugin_loads_and_registers() {
   if (skip) return "SKIP: " + skipNote;
@@ -36,13 +38,8 @@ export async function t_plugin_exec_roundtrip() {
 export async function t_dist_entry_matches_contract() {
   // The runtime artifact (dist/index.js) is what OpenClaw actually loads (runtimeExtensions).
   // It must carry the SAME defineToolPlugin product as src/index.ts, i.e. a register().
-  let distEntry = null;
-  try {
-    const mod = await import("../dist/index.js");
-    distEntry = mod.default;
-  } catch (e) {
-    return "SKIP: dist not built (" + e.message + ")";
-  }
+  if (skip) return "SKIP: " + skipNote;
+  const distEntry = (await import("../dist/index.js")).default;
   if (!distEntry || typeof distEntry.register !== "function") throw new Error("dist entry missing register() - OpenClaw would load it as non-capability");
   const registered = [];
   const mockApi = { registerTool(spec, opts) { registered.push({ spec, opts }); }, pluginConfig: {} };
